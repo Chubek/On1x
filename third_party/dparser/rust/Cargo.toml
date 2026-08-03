@@ -1,0 +1,3 @@
+[workspace]
+members = ["dparser_lib", "example"]
+resolver = "3"
