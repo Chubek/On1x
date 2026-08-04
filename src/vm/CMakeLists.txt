@@ -10,7 +10,7 @@ target_include_directories(on1x_vm
   PUBLIC ${PROJECT_SOURCE_DIR}/src
   PRIVATE ${PROJECT_SOURCE_DIR}/include
 )
-target_link_libraries(on1x_vm PUBLIC on1x_runtime on1x_core on1x_gc on1x_syntax)
+target_link_libraries(on1x_vm PUBLIC on1x_runtime on1x_core on1x_gc on1x_ir on1x_syntax)
 
 if(MSVC)
   target_compile_options(on1x_vm PRIVATE /W4 /permissive-)

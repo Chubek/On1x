@@ -1,6 +1,9 @@
 #include "api/api_common.hpp"
 
 #include "core/table.hpp"
+#include "ir/lower_ast.hpp"
+#include "ir/verifier.hpp"
+#include "sema/resolver.hpp"
 #include "syntax/parser.hpp"
 #include "vm/emitter.hpp"
 #include "vm/interpreter.hpp"
@@ -35,11 +38,25 @@ On1x_Status on1x_eval(On1x_State* state, const char* source, size_t length, cons
         on1x::Arena arena;
         on1x::syntax::Diagnostics diagnostics;
         on1x::syntax::Parser parser(text, arena, diagnostics);
-        const auto* program = parser.parse_program();
-        if (!program || !diagnostics.empty()) return on1x::push_api_error(state, "invalid On1x chunk");
+        auto* program = parser.parse_program();
+        if (!program || !diagnostics.empty()) {
+            return on1x::push_api_error(
+                state,
+                diagnostics.empty() ? "invalid On1x chunk" : diagnostics.entries().front().message.c_str());
+        }
+        on1x::sema::Resolver resolver(diagnostics);
+        if (!resolver.resolve(program) || !diagnostics.empty()) {
+            return on1x::push_api_error(state, "invalid On1x semantics");
+        }
+        on1x::ir::Module module;
+        if (!on1x::ir::lower_ast(program, module, diagnostics) ||
+            !on1x::ir::verify(module, diagnostics) ||
+            !diagnostics.empty()) {
+            return on1x::push_api_error(state, "unable to lower On1x chunk");
+        }
         on1x::vm::Chunk chunk(&state->gc);
         on1x::vm::Emitter emitter(state, chunk, diagnostics);
-        if (!emitter.emit_program(program) || !diagnostics.empty()) {
+        if (!emitter.emit_module(module) || !diagnostics.empty()) {
             return on1x::push_api_error(state, "unable to compile On1x chunk");
         }
         on1x::Value result;

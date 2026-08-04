@@ -7,8 +7,16 @@ namespace on1x::vm {
 enum class Opcode : std::uint8_t {
     Constant,
     LoadGlobal,
+    StoreGlobal,
     Add,
     Subtract,
+    LoadLocal,
+    StoreLocal,
+    LoadUpvalue,
+    MakeClosure,
+    Call,
+    JumpIfFalse,
+    Jump,
     Pop,
     Return,
 };

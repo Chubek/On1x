@@ -9,12 +9,20 @@
 #include "gc/handle_table.hpp"
 
 #include <cstddef>
+#include <cstdint>
+
+namespace on1x::vm {
+class Chunk;
+}
 
 namespace on1x {
 
 struct FunctionObject {
     ObjectHeader header{ObjectKind::Function};
     On1x_CFn native = nullptr;
+    vm::Chunk* chunk = nullptr;
+    Value* captures = nullptr;
+    std::size_t capture_count = 0;
 };
 
 struct ApiReference {

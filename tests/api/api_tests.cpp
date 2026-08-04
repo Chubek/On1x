@@ -39,6 +39,59 @@ int main() {
     CHECK(on1x_eval(state, "1+2", 3, "test") == ON1X_OK);
     CHECK(on1x_as_int(state, -1) == 3);
     CHECK(on1x_pop(state, 1) == 1);
+    const char* binding_chunk = "let answer = 40 + 2\nanswer = answer + 1\nanswer";
+    CHECK(on1x_eval(state, binding_chunk, std::strlen(binding_chunk), "test") == ON1X_OK);
+    CHECK(on1x_as_int(state, -1) == 43);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* function_chunk =
+        "fn add(a, b) { return a + b }\n"
+        "add(20, 22)";
+    CHECK(on1x_eval(state, function_chunk, std::strlen(function_chunk), "test") == ON1X_OK);
+    CHECK(on1x_as_int(state, -1) == 42);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* closure_chunk =
+        "let make_adder = fn(base) { fn(value) { base + value } }\n"
+        "let add_two = make_adder(2)\n"
+        "add_two(40)";
+    CHECK(on1x_eval(state, closure_chunk, std::strlen(closure_chunk), "test") == ON1X_OK);
+    CHECK(on1x_as_int(state, -1) == 42);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* deep_closure_chunk =
+        "let outer = fn(base) { fn() { fn(value) { base + value } } }\n"
+        "outer(2)()(40)";
+    CHECK(on1x_eval(state, deep_closure_chunk, std::strlen(deep_closure_chunk), "test") == ON1X_OK);
+    CHECK(on1x_as_int(state, -1) == 42);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* rest_chunk = "fn collect(first, rest..) { rest }\ncollect(1, 2, 3)";
+    CHECK(on1x_eval(state, rest_chunk, std::strlen(rest_chunk), "test") == ON1X_OK);
+    CHECK(on1x_type(state, -1) == ON1X_LIST && on1x_len(state, -1) == 2);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* early_return_chunk =
+        "fn choose(flag) { if flag { return 42 }\n"
+        "                 0 }\n"
+        "choose(true)";
+    CHECK(on1x_eval(state, early_return_chunk, std::strlen(early_return_chunk), "test") == ON1X_OK);
+    CHECK(on1x_as_int(state, -1) == 42);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* conditional_chunk =
+        "let value = 10\n"
+        "if true { let value = 20\n"
+        "          value + 1 } else { 0 }\n"
+        "value";
+    CHECK(on1x_eval(state, conditional_chunk, std::strlen(conditional_chunk), "test") == ON1X_OK);
+    CHECK(on1x_as_int(state, -1) == 10);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* false_branch = "if false { 1 } else { 2 }";
+    CHECK(on1x_eval(state, false_branch, std::strlen(false_branch), "test") == ON1X_OK);
+    CHECK(on1x_as_int(state, -1) == 2);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* no_else = "if false { 1 }";
+    CHECK(on1x_eval(state, no_else, std::strlen(no_else), "test") == ON1X_OK);
+    CHECK(on1x_type(state, -1) == ON1X_UNIT);
+    CHECK(on1x_pop(state, 1) == 1);
+    CHECK(on1x_eval(state, "if 1 { 2 }", 10, "test") == ON1X_ERR);
+    CHECK(on1x_is_error(state, -1));
+    CHECK(on1x_pop(state, 1) == 1);
     CHECK(on1x_eval(state, "@", 1, "test") == ON1X_ERR);
     CHECK(on1x_type(state, -1) == ON1X_LIST);
     CHECK(on1x_is_error(state, -1));
@@ -86,6 +139,9 @@ int main() {
     CHECK(on1x_pop(state, 1) == 1);
 
     CHECK(on1x_register(state, "Add", add_ints) == ON1X_OK);
+    CHECK(on1x_eval(state, "Add(20, 22)", 11, "test") == ON1X_OK);
+    CHECK(on1x_as_int(state, -1) == 42);
+    CHECK(on1x_pop(state, 1) == 1);
     CHECK(on1x_eval(state, "Add", 3, "test") == ON1X_OK);
     on1x_push_int(state, 2);
     on1x_push_int(state, 3);

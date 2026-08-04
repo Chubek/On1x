@@ -33,6 +33,26 @@ bool Chunk::emit(Opcode opcode, std::uint32_t operand) {
     return true;
 }
 
+void Chunk::patch_operand(std::size_t index, std::uint32_t operand) noexcept {
+    instructions_[index].operand = operand;
+}
+
+void Chunk::set_signature(
+    const std::uint32_t* parameter_bindings,
+    std::size_t parameter_count,
+    bool variadic,
+    std::size_t capture_count) noexcept {
+    parameter_bindings_ = parameter_count == 0
+        ? nullptr
+        : gc_alloc_array<std::uint32_t>(gc_, parameter_count);
+    for (std::size_t index = 0; index < parameter_count; ++index) {
+        parameter_bindings_[index] = parameter_bindings[index];
+    }
+    parameter_count_ = parameter_count;
+    variadic_ = variadic;
+    capture_count_ = capture_count;
+}
+
 const Value& Chunk::constant(std::uint32_t index) const noexcept { return constants_[index]; }
 const Instruction& Chunk::instruction(std::size_t index) const noexcept { return instructions_[index]; }
 

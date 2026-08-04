@@ -15,6 +15,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(third_party/utf8proc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/libgc EXCLUDE_FROM_ALL)
+# dparser's vendored CMakeLists declares a 3.0 minimum. Modern CMake requires
+# this compatibility floor without modifying vendored sources.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+add_subdirectory(third_party/dparser EXCLUDE_FROM_ALL)
 if(ON1X_ENABLE_FFI)
   # dyncall's vendored CMakeLists declares a 2.6 minimum. Modern CMake
   # requires this compatibility floor without modifying vendored sources.
