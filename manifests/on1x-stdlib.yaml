@@ -1,0 +1,704 @@
+# manifests/on1x-stdlib.yaml
+manifest: on1x-stdlib
+manifest_version: 1
+targets_spec: docs/SPECS.md
+companion_manifest: manifests/on1x-sources.yaml
+
+description: >
+  Standard library for On1x. Two tiers: the always-present prelude (already
+  owned by src/prelude, listed here only for cross-reference) and opt-in
+  stdlib modules that the host installs explicitly. Every module is a Table
+  used as a namespace (spec §17 "Tables as namespaces"). Nothing in this
+  manifest is loaded implicitly by on1x_new.
+
+language: C++20
+public_abi: C11
+artifacts:
+  - libon1x.so / libon1x.a        # stdlib links into the same library
+  - lib/on1x/*.on1x               # On1x-source modules, embedded at build time
+
+# ---------------------------------------------------------------------------
+# Conventions every module in this manifest obeys
+# ---------------------------------------------------------------------------
+conventions:
+  namespace_shape: >
+    Each module is a Table whose keys are Tags and whose values are :Fn.
+    Installing a module means binding that Table to one global name.
+    Modules never write to any other global.
+  no_nil: >
+    Absence is :None. Lookups, parses, and conversions that can fail without
+    being errors return :Some[v] / :None. Never a sentinel, never an empty
+    List standing in for absence.
+  errors_vs_optionals: >
+    Optional for "expected absence" (missing key, no match, out of range).
+    :Error[payload] via '~' for "operation failed" (I/O failure, bad syntax,
+    permission denied). Programmer mistakes (wrong arity, wrong type) raise.
+  no_truthiness: "Predicates take and return :Bool only (spec §11)."
+  purity_default: >
+    A module is pure unless it declares a capability. Pure modules perform no
+    syscalls, read no clock, touch no environment, and are deterministic.
+  capability_gating: >
+    Impure modules require the host to grant a capability at install time.
+    Ungranted capability means the module is simply absent from the
+    environment, not present-but-failing.
+  arity: "Fixed arity unless the entry declares variadic: true (rest.. tail)."
+  naming: "Module Tags and member Tags are PascalCase, matching prelude style."
+  gc: "All returned aggregates are GC-allocated and rooted per src/gc/roots.hpp."
+  no_exceptions_across_abi: >
+    Native module bodies use the src/api/api_common.cpp no-throw guard.
+
+# ---------------------------------------------------------------------------
+# Public headers (installed)
+# ---------------------------------------------------------------------------
+public_headers:
+  - path: include/on1x/on1x_stdlib.h
+    purpose: >
+      C entry points for installing stdlib modules:
+      on1x_open_std (all pure modules), and one on1x_open_<mod> per module.
+      Each returns on1x_Status and leaves the module Table on the stack.
+    spec: "§17, §19"
+  - path: include/on1x/on1x_capability.h
+    purpose: >
+      on1x_Capability bitset (ON1X_CAP_NONE, _FS, _IO, _ENV, _TIME, _CLOCK,
+      _PROC, _NET, _DL) and on1x_grant/on1x_revoke/on1x_has_capability.
+      Enforces spec §17 "no implicit I/O".
+    spec: "§17"
+  - path: include/on1x/stdlib.hpp
+    purpose: "C++ facade: on1x::open_std(State&), on1x::open<Module>(State&)."
+  - path: include/on1x/on1x_module.h
+    purpose: >
+      on1x_ModuleDesc / on1x_FnDesc so hosts can register their own modules
+      through the same path the stdlib uses.
+
+# ---------------------------------------------------------------------------
+# Shared stdlib infrastructure
+# ---------------------------------------------------------------------------
+infrastructure:
+  dir: src/stdlib
+  files:
+    - path: src/stdlib/registry.cpp
+      hpp: src/stdlib/registry.hpp
+      purpose: "Module table: name, capability, install fn, dependency list."
+    - path: src/stdlib/module.cpp
+      hpp: src/stdlib/module.hpp
+      purpose: "Builds a namespace Table from an on1x_ModuleDesc; interns member Tags once."
+    - path: src/stdlib/capability.cpp
+      hpp: src/stdlib/capability.hpp
+      purpose: "Capability storage on on1x_State; checked at install time, not per call."
+    - path: src/stdlib/args.cpp
+      hpp: src/stdlib/args.hpp
+      purpose: >
+        Argument decoding helpers: arity check, type check with spec-accurate
+        error messages, Int/Float promotion, index normalisation.
+    - path: src/stdlib/embed.cpp
+      hpp: src/stdlib/embed.hpp
+      purpose: "Loads and evaluates embedded On1x-source modules (see embedded_sources)."
+    - path: src/stdlib/doc.cpp
+      hpp: src/stdlib/doc.hpp
+      purpose: "Per-member doc strings; consumed by the REPL's help. Compiled out when ON1X_STDLIB_DOCS=OFF."
+    - path: src/stdlib/std_all.cpp
+      purpose: "on1x_open_std: installs every module with capability == NONE."
+
+# ---------------------------------------------------------------------------
+# Tier 0 — prelude (owned by manifests/on1x-sources.yaml, listed for reference)
+# ---------------------------------------------------------------------------
+prelude_reference:
+  dir: src/prelude
+  always_available: true
+  capability: NONE
+  members:
+    - TypeOf, TagOf, PayloadOf
+    - Len, Get, Set, Push, Pop
+    - Keys, Values
+    - Iota
+    - IsSome, IsNone, Unwrap, UnwrapOr
+    - IsSuccess, IsError
+  note: >
+    Do not duplicate these in a module. Str/List/Table below extend the
+    prelude; they never shadow it.
+
+# ---------------------------------------------------------------------------
+# Tier 1 — pure modules
+# ---------------------------------------------------------------------------
+modules:
+
+  - name: Math
+    dir: src/stdlib/math
+    capability: NONE
+    spec: "§4 (:Int, :Float), §10"
+    files:
+      - path: src/stdlib/math/math.cpp
+        purpose: "Registration and elementary arithmetic."
+      - path: src/stdlib/math/trig.cpp
+        purpose: "Sin, Cos, Tan, Asin, Acos, Atan, Atan2."
+      - path: src/stdlib/math/exp_log.cpp
+        purpose: "Exp, Log, Log2, Log10, Pow, Sqrt, Cbrt."
+      - path: src/stdlib/math/round.cpp
+        purpose: "Floor, Ceil, Trunc, Round (half-away-from-zero), Frac."
+      - path: src/stdlib/math/int_ops.cpp
+        purpose: "DivMod, Gcd, Lcm, IntPow with explicit overflow reporting."
+    exports:
+      - "Abs(x: :Int|:Float) -> same type"
+      - "Min(a, b) / Max(a, b) -> same type"
+      - "Clamp(x, lo, hi) -> same type"
+      - "Sign(x) -> :Int in {-1, 0, 1}"
+      - "Sqrt(x: :Float) -> :Some[:Float] | :None    # :None when x < 0"
+      - "Log(x) / Log2(x) / Log10(x) -> :Some[:Float] | :None  # :None when x <= 0"
+      - "Pow(b, e) -> :Float"
+      - "Exp(x) -> :Float"
+      - "Sin/Cos/Tan/Asin/Acos/Atan(x: :Float) -> :Float ; Asin/Acos give :None outside [-1,1]"
+      - "Atan2(y, x) -> :Float"
+      - "Floor/Ceil/Trunc/Round(x: :Float) -> :Float ; ToInt(x: :Float) -> :Some[:Int] | :None"
+      - "DivMod(a: :Int, b: :Int) -> :Some[[q, r]] | :None    # :None when b == 0"
+      - "Gcd(a, b) / Lcm(a, b) -> :Int"
+      - "IsNaN(x) / IsInf(x) -> :Bool"
+    constants:
+      - "Pi, E, Tau, Inf, NegInf, NaN, IntMin, IntMax, FloatEpsilon"
+    decisions:
+      - "Domain errors return :None rather than NaN, so no nil-like value escapes (spec §7)."
+      - "NaN is still reachable through Float arithmetic; IsNaN exists to inspect it."
+
+  - name: Str
+    dir: src/stdlib/str
+    capability: NONE
+    spec: "§3.6 (string literals), §4 (:String), UTF-8 rules in src/util/utf8"
+    files:
+      - path: src/stdlib/str/str.cpp
+        purpose: "Registration; length, indexing, slicing by codepoint."
+      - path: src/stdlib/str/search.cpp
+        purpose: "Find, RFind, Contains, StartsWith, EndsWith, Count."
+      - path: src/stdlib/str/transform.cpp
+        purpose: "Upper, Lower, Trim, TrimStart, TrimEnd, Pad, Repeat, Replace, Reverse."
+      - path: src/stdlib/str/split_join.cpp
+        purpose: "Split, SplitLines, Join, Chars, Bytes, Words."
+      - path: src/stdlib/str/convert.cpp
+        purpose: "ToInt, ToFloat, ToBool, FromInt, FromFloat, ToTag, Format."
+      - path: src/stdlib/str/utf8_api.cpp
+        purpose: "Codepoint <-> string, IsValidUtf8, ByteLen vs CharLen."
+    exports:
+      - "CharLen(s) -> :Int    # codepoints"
+      - "ByteLen(s) -> :Int"
+      - "At(s, i: :Int) -> :Some[:String] | :None    # one codepoint, negative i counts from end"
+      - "Slice(s, start, end) -> :Some[:String] | :None    # half-open, codepoint indices"
+      - "Find(s, needle) -> :Some[:Int] | :None"
+      - "Contains/StartsWith/EndsWith(s, t) -> :Bool"
+      - "Split(s, sep) -> :List of :String ; SplitLines(s) -> :List"
+      - "Join(parts: :List, sep) -> :Some[:String] | :None    # :None if any element is not :String"
+      - "Chars(s) -> :List of :String ; Bytes(s) -> :List of :Int"
+      - "Upper/Lower/Trim/TrimStart/TrimEnd(s) -> :String"
+      - "Replace(s, from, to) -> :String ; ReplaceFirst(s, from, to) -> :String"
+      - "Repeat(s, n: :Int) -> :Some[:String] | :None    # :None when n < 0"
+      - "ToInt(s) -> :Some[:Int] | :None ; ToFloat(s) -> :Some[:Float] | :None"
+      - "FromInt(n) / FromFloat(x) -> :String"
+      - "ToTag(s) -> :Tag    # interns; mirrors string-Tag syntax in spec §3.6"
+      - "Format(template, args: :List) -> :Some[:String] | :None"
+      - "IsValidUtf8(s) -> :Bool ; FromCodepoint(n: :Int) -> :Some[:String] | :None"
+    decisions:
+      - "Indices are codepoint-based everywhere except ByteLen/Bytes. Splitting a codepoint is not representable."
+      - "Case mapping is ASCII-only in 0.1.0. Full Unicode casing is deferred and documented as such."
+      - "Format uses {} positional holes and {{ }} escapes; no implicit stringification of Lists or Tables."
+
+  - name: List
+    dir: src/stdlib/list
+    capability: NONE
+    spec: "§5 (Lists), §14 (patterns), §8 (Tagged Lists)"
+    files:
+      - path: src/stdlib/list/list.cpp
+        purpose: "Registration; construction, slicing, concat, copy."
+      - path: src/stdlib/list/access.cpp
+        purpose: "First, Last, Take, Drop, Insert, Remove, Reverse, Fill."
+      - path: src/stdlib/list/higher_order.cpp
+        purpose: "Map, Filter, Reduce, ForEach, Any, All, Find, FindIndex, Partition."
+      - path: src/stdlib/list/sort.cpp
+        purpose: "Sort, SortBy, IsSorted, Unique. Stable merge sort over GC storage."
+      - path: src/stdlib/list/zip.cpp
+        purpose: "Zip, Unzip, Enumerate, Flatten, Chunk, Window."
+    exports:
+      - "New(n: :Int, fill) -> :Some[:List] | :None    # :None when n < 0"
+      - "Copy(l) -> :List    # shallow"
+      - "Concat(a, b) -> :List ; Append(l, items: :List) -> :List"
+      - "First(l) / Last(l) -> :Some[v] | :None"
+      - "Take(l, n) / Drop(l, n) -> :List    # saturating, never errors"
+      - "Slice(l, start, end) -> :Some[:List] | :None"
+      - "Insert(l, i, v) -> :Bool    # in place, false when i out of range"
+      - "Remove(l, i) -> :Some[v] | :None    # in place"
+      - "Reverse(l) -> :List ; ReverseInPlace(l) -> :Unit"
+      - "Map(l, f) / Filter(l, f) -> :List"
+      - "Reduce(l, f, init) -> value ; ForEach(l, f) -> :Unit"
+      - "Any(l, f) / All(l, f) -> :Bool"
+      - "Find(l, f) -> :Some[v] | :None ; FindIndex(l, f) -> :Some[:Int] | :None"
+      - "IndexOf(l, v) -> :Some[:Int] | :None    # structural equality"
+      - "Sort(l) -> :Some[:List] | :None    # :None if elements are not mutually orderable"
+      - "SortBy(l, cmp) -> :List    # cmp returns :Int"
+      - "Unique(l) -> :List ; Count(l, f) -> :Int"
+      - "Zip(a, b) -> :List of pairs ; Unzip(l) -> :Some[[a, b]] | :None"
+      - "Enumerate(l) -> :List of [i, v]"
+      - "Flatten(l) -> :Some[:List] | :None    # one level; :None if an element is not :List"
+      - "Chunk(l, n) -> :Some[:List] | :None ; Window(l, n) -> :Some[:List] | :None"
+    decisions:
+      - "Map/Filter/Sort return new Lists. Mutating variants carry an InPlace suffix."
+      - "Higher-order members reject non-:Fn callbacks by raising, not by returning :None."
+      - "Tagged Lists are not treated specially here; use TagOf/PayloadOf from the prelude."
+
+  - name: Table
+    dir: src/stdlib/table
+    capability: NONE
+    spec: "§6 (Tables), key hashability rules"
+    files:
+      - path: src/stdlib/table/table.cpp
+        purpose: "Registration; construction, copy, merge, size."
+      - path: src/stdlib/table/query.cpp
+        purpose: "HasKey, GetOr, Entries, FromEntries, Invert, Pick, Omit."
+      - path: src/stdlib/table/higher_order.cpp
+        purpose: "MapValues, FilterKeys, ReduceEntries, ForEachEntry."
+    exports:
+      - "New() -> :Table ; Copy(t) -> :Table    # shallow"
+      - "HasKey(t, k) -> :Bool"
+      - "GetOr(t, k, default) -> value"
+      - "Remove(t, k) -> :Some[v] | :None"
+      - "Merge(a, b) -> :Table    # b wins on conflict"
+      - "Entries(t) -> :List of [k, v]"
+      - "FromEntries(l) -> :Some[:Table] | :None    # :None on unhashable key or malformed pair"
+      - "Invert(t) -> :Some[:Table] | :None    # :None if a value is unhashable"
+      - "Pick(t, keys: :List) / Omit(t, keys: :List) -> :Table"
+      - "MapValues(t, f) -> :Table ; FilterKeys(t, f) -> :Table"
+      - "ReduceEntries(t, f, init) -> value ; ForEachEntry(t, f) -> :Unit"
+      - "IsHashable(v) -> :Bool"
+    invariants:
+      - "Every key-accepting member routes through src/core/hashing.cpp and rejects :List / :Table keys."
+      - "Iteration order is unspecified. Tests must not depend on it; sort Keys first."
+
+  - name: Iter
+    dir: src/stdlib/iter
+    capability: NONE
+    spec: "§7 (Iota), §13 (for), §5"
+    files:
+      - path: src/stdlib/iter/iter.cpp
+        purpose: "Registration. Lazy pull-based sequences over Lists, Tables, Iota, and Fn generators."
+      - path: src/stdlib/iter/adapters.cpp
+        purpose: "Map, Filter, Take, Drop, TakeWhile, DropWhile, Chain, Zip."
+      - path: src/stdlib/iter/consume.cpp
+        purpose: "Next, Collect, Fold, Count, Sum, Product, Nth, Last."
+    exports:
+      - "FromList(l) / FromTable(t) / FromIota(i) -> iterator"
+      - "FromFn(f) -> iterator    # f returns :Some[v] to yield, :None to stop"
+      - "Next(it) -> :Some[v] | :None"
+      - "Map/Filter/Take/Drop/TakeWhile/DropWhile(it, ...) -> iterator"
+      - "Chain(a, b) / Zip(a, b) -> iterator"
+      - "Collect(it) -> :List ; Fold(it, f, init) -> value"
+      - "Count(it) -> :Int ; Sum(it) / Product(it) -> :Some[num] | :None"
+      - "Nth(it, n) / Last(it) -> :Some[v] | :None"
+    decisions:
+      - "An iterator is a Tagged List :Iter[state] so TypeOf stays :List (spec §8). No new core type."
+      - "Iterators are single-pass and stateful. Reusing an exhausted iterator yields :None, not an error."
+      - "Infinite iterators are permitted; Collect on one does not terminate. Documented, not guarded."
+
+  - name: Fn
+    dir: src/stdlib/fn
+    capability: NONE
+    spec: "§12 (functions, closures), §4 (:Fn)"
+    files:
+      - path: src/stdlib/fn/fn.cpp
+        purpose: "Registration; Apply, Arity, IsVariadic."
+      - path: src/stdlib/fn/combinators.cpp
+        purpose: "Compose, Pipe, Partial, Flip, Identity, Const, Memo."
+    exports:
+      - "Apply(f, args: :List) -> value"
+      - "Arity(f) -> :Int ; IsVariadic(f) -> :Bool"
+      - "Compose(f, g) -> :Fn ; Pipe(fns: :List) -> :Some[:Fn] | :None"
+      - "Partial(f, bound: :List) -> :Fn"
+      - "Flip(f) -> :Fn ; Identity(x) -> x ; Const(x) -> :Fn"
+      - "Memo(f) -> :Fn    # requires hashable arguments; raises on unhashable"
+
+  - name: Opt
+    dir: src/stdlib/opt
+    capability: NONE
+    spec: "§9 (optionals)"
+    files:
+      - path: src/stdlib/opt/opt.cpp
+        purpose: "Registration; combinators over :Some / :None beyond the prelude four."
+    exports:
+      - "Map(o, f) -> :Some | :None"
+      - "AndThen(o, f) -> :Some | :None    # f returns an optional"
+      - "OrElse(o, f) -> :Some | :None"
+      - "Filter(o, pred) -> :Some | :None"
+      - "ToList(o) -> :List    # [] or [v]"
+      - "FromList(l) -> :Some[v] | :None    # first element, or :None if empty"
+      - "Zip(a, b) -> :Some[[x, y]] | :None"
+      - "Flatten(o) -> :Some | :None"
+    invariants:
+      - "Never constructs a bare payload where an optional is expected, and never unwraps implicitly."
+
+  - name: Res
+    dir: src/stdlib/res
+    capability: NONE
+    spec: "§10 (effects, :Success / :Error)"
+    files:
+      - path: src/stdlib/res/res.cpp
+        purpose: "Registration; combinators over :Success / :Error produced by '~'."
+    exports:
+      - "Map(r, f) -> :Success | :Error"
+      - "MapError(r, f) -> :Success | :Error"
+      - "AndThen(r, f) -> :Success | :Error"
+      - "OrElse(r, f) -> :Success | :Error"
+      - "Payload(r) -> :Some[v] | :None    # :None when the arm carries no payload"
+      - "ToOpt(r) -> :Some[v] | :None"
+      - "UnwrapOr(r, default) -> value"
+      - "Collect(l: :List of results) -> :Success[:List] | :Error[first]"
+    invariants:
+      - >
+        This module operates on already-captured result values. It never
+        performs capture; only '~' does that, and only in the follower
+        statement (spec §10).
+
+  - name: Bit
+    dir: src/stdlib/bit
+    capability: NONE
+    spec: "§4 (:Int width and wrapping semantics)"
+    files:
+      - path: src/stdlib/bit/bit.cpp
+        purpose: "And, Or, Xor, Not, Shl, Shr, Sar, RotL, RotR, PopCount, Clz, Ctz, Test, Set, Clear."
+    exports:
+      - "And/Or/Xor(a: :Int, b: :Int) -> :Int ; Not(a) -> :Int"
+      - "Shl/Shr/Sar(a, n) -> :Some[:Int] | :None    # :None when n < 0 or n >= Int width"
+      - "RotL/RotR(a, n) -> :Int"
+      - "PopCount/Clz/Ctz(a) -> :Int"
+      - "Test(a, i) -> :Some[:Bool] | :None ; Set/Clear/Toggle(a, i) -> :Some[:Int] | :None"
+    decisions:
+      - "Shr is logical, Sar arithmetic. Named explicitly so sign behaviour is never ambiguous."
+
+  - name: Tag
+    dir: src/stdlib/tag
+    capability: NONE
+    spec: "§4 (:Tag), §8 (Tagged Lists), §16 (enums)"
+    files:
+      - path: src/stdlib/tag/tag.cpp
+        purpose: "Name, FromString, IsTag, Attach, Detach, enum reflection."
+    exports:
+      - "Name(t: :Tag) -> :String"
+      - "FromString(s) -> :Tag    # interns"
+      - "Attach(t: :Tag, payload: :List) -> :List    # builds a Tagged List"
+      - "Detach(l) -> :Some[[tag, payload]] | :None"
+      - "Is(l, t: :Tag) -> :Bool    # tag test on a Tagged List"
+      - "EnumMembers(e: :Table) -> :List of :Tag    # sorted by Iota value"
+      - "EnumOf(e: :Table, n: :Int) -> :Some[:Tag] | :None    # reverse lookup"
+    invariants:
+      - "Attach does not change TypeOf: the result still reports :List (spec §8)."
+
+  - name: Cmp
+    dir: src/stdlib/cmp
+    capability: NONE
+    spec: "§11 (operators, equality)"
+    files:
+      - path: src/stdlib/cmp/cmp.cpp
+        purpose: "Eq, Ne, Lt, Le, Gt, Ge, Compare, Hash, DeepEq, Ordering tags."
+    exports:
+      - "Compare(a, b) -> :Some[:Int] | :None    # :None when not mutually orderable"
+      - "Eq(a, b) -> :Bool    # structural, matches the == operator exactly"
+      - "DeepEq(a, b) -> :Bool    # structural with cycle detection"
+      - "Hash(v) -> :Some[:Int] | :None    # :None for unhashable values"
+      - "MinOf(l: :List) / MaxOf(l: :List) -> :Some[v] | :None"
+    invariants:
+      - "Cmp.Eq must agree with src/runtime/operators.cpp bit for bit. A shared test vector covers both."
+
+# ---------------------------------------------------------------------------
+# Tier 2 — capability-gated modules
+# ---------------------------------------------------------------------------
+capability_modules:
+
+  - name: Io
+    dir: src/stdlib/io
+    capability: ON1X_CAP_IO
+    spec: "§17 (no implicit I/O), §10 (effects)"
+    files:
+      - path: src/stdlib/io/io.cpp
+        purpose: "Registration; Print, Println, EPrint, Write to stdout/stderr."
+      - path: src/stdlib/io/read.cpp
+        purpose: "ReadLine, ReadAll from stdin."
+      - path: src/stdlib/io/render.cpp
+        purpose: "Repr and Show, delegating to src/core/render.cpp."
+    exports:
+      - "Print(args..) -> :Unit ; Println(args..) -> :Unit"
+      - "EPrint(args..) / EPrintln(args..) -> :Unit"
+      - "ReadLine() -> :Some[:String] | :None    # :None at EOF"
+      - "ReadAll() -> :Some[:String] | :None"
+      - "Show(v) -> :String    # human-readable"
+      - "Repr(v) -> :String    # round-trippable where the spec defines a literal form"
+    notes:
+      - >
+        This supersedes the ad-hoc Print in src/tools/host_prelude.cpp. That
+        file should install Io and re-export Print rather than keep a second
+        implementation. Flagged as a manifest reconciliation item.
+      - "Show and Repr are pure and are also re-exported from Str, so pure code can format without ON1X_CAP_IO."
+
+  - name: Fs
+    dir: src/stdlib/fs
+    capability: ON1X_CAP_FS
+    spec: "§17, §10"
+    files:
+      - path: src/stdlib/fs/fs.cpp
+        purpose: "Registration; ReadFile, WriteFile, AppendFile, Exists, Remove."
+      - path: src/stdlib/fs/dir.cpp
+        purpose: "ListDir, MakeDir, MakeDirAll, RemoveDir, IsDir, IsFile."
+      - path: src/stdlib/fs/path.cpp
+        purpose: "Join, Dirname, Basename, Extension, Normalize, IsAbsolute. Pure, no syscalls."
+      - path: src/stdlib/fs/stat.cpp
+        purpose: "Size, ModTime, Metadata as a Table."
+    exports:
+      - "ReadFile(path) -> raises on failure; use '~' to capture :Success[:String] / :Error[info]"
+      - "WriteFile(path, contents) / AppendFile(path, contents) -> :Unit or raises"
+      - "Exists(path) -> :Bool ; IsDir(path) / IsFile(path) -> :Bool"
+      - "ListDir(path) -> :List of :String, or raises"
+      - "MakeDir(path) / MakeDirAll(path) / Remove(path) / RemoveDir(path)"
+      - "Size(path) -> :Some[:Int] | :None ; Metadata(path) -> :Some[:Table] | :None"
+      - "Path.Join(parts..) / Path.Dirname(p) / Path.Basename(p) / Path.Extension(p) -> :String"
+    decisions:
+      - >
+        Fs operations that can fail for environmental reasons raise, so callers
+        use '~' and get :Error[Table] with :Kind, :Path, :Message. Predicates
+        like Exists return :Bool because "not there" is not a failure.
+      - "Path.* is a nested pure namespace and is also installed without ON1X_CAP_FS."
+    security:
+      - "No path is dereferenced without normalisation. Symlink and traversal behaviour is documented per platform."
+      - "Sandbox root, when set via src/runtime/sandbox.cpp, is enforced here before every syscall."
+
+  - name: Os
+    dir: src/stdlib/os
+    capability: ON1X_CAP_ENV
+    spec: "§17"
+    files:
+      - path: src/stdlib/os/os.cpp
+        purpose: "Platform, Arch, Hostname, Cwd, Chdir, Args."
+      - path: src/stdlib/os/env.cpp
+        purpose: "GetEnv, SetEnv, UnsetEnv, EnvTable."
+    exports:
+      - "Platform() -> :Tag in {:Linux, :Darwin, :Windows, :Bsd, :Unknown}"
+      - "Arch() -> :Tag in {:X86_64, :Aarch64, :Unknown}"
+      - "GetEnv(name) -> :Some[:String] | :None"
+      - "SetEnv(name, value) / UnsetEnv(name) -> :Unit or raises"
+      - "EnvTable() -> :Table ; Cwd() -> :Some[:String] | :None ; Args() -> :List"
+    security:
+      - "Never logs environment values. Hosts that grant ON1X_CAP_ENV are exposing secrets by definition; this is documented in the header."
+
+  - name: Time
+    dir: src/stdlib/time
+    capability: ON1X_CAP_TIME
+    spec: "§17"
+    files:
+      - path: src/stdlib/time/time.cpp
+        purpose: "Now, MonotonicNow, Sleep."
+      - path: src/stdlib/time/calendar.cpp
+        purpose: "Break a Unix timestamp into a Table; Format and Parse (ISO 8601 subset)."
+    exports:
+      - "Now() -> :Int    # Unix seconds"
+      - "NowMillis() / NowNanos() -> :Int"
+      - "Monotonic() -> :Int    # nanoseconds, unspecified epoch"
+      - "Sleep(ms: :Int) -> :Unit"
+      - "Breakdown(ts: :Int) -> :Table with :Year :Month :Day :Hour :Minute :Second :Weekday"
+      - "Format(ts, fmt) -> :Some[:String] | :None ; Parse(s) -> :Some[:Int] | :None"
+    decisions:
+      - "UTC only in 0.1.0. Local-time conversion is deferred; the header says so explicitly."
+
+  - name: Rand
+    dir: src/stdlib/rand
+    capability: NONE
+    spec: "§17"
+    files:
+      - path: src/stdlib/rand/rand.cpp
+        purpose: "Explicitly-seeded PRNG (xoshiro256**). No global state, no entropy access."
+      - path: src/stdlib/rand/system.cpp
+        purpose: "SeedFromSystem, compiled only when ON1X_CAP_ENV is grantable."
+    exports:
+      - "New(seed: :Int) -> generator    # :Rng[state] Tagged List"
+      - "Int(g) -> :Int ; IntBelow(g, n) -> :Some[:Int] | :None"
+      - "Range(g, lo, hi) -> :Some[:Int] | :None ; Float(g) -> :Float in [0, 1)"
+      - "Bool(g) -> :Bool ; Choice(g, l: :List) -> :Some[v] | :None"
+      - "Shuffle(g, l: :List) -> :List"
+      - "SeedFromSystem() -> :Int    # requires ON1X_CAP_ENV"
+    decisions:
+      - >
+        The generator is pure and capability-free because the host supplies the
+        seed. Only entropy acquisition is gated. This keeps deterministic
+        replay possible in a sandbox.
+      - "Not cryptographically secure. Stated in the header; no crypto module in 0.1.0."
+
+  - name: Dl
+    dir: src/stdlib/dl
+    capability: ON1X_CAP_DL
+    spec: "§20 (FFI)"
+    depends_on: [src/ffi]
+    third_party: [dynalo, dyncall]
+    build_flag: ON1X_ENABLE_FFI
+    files:
+      - path: src/stdlib/dl/dl.cpp
+        purpose: "Open, Close, Symbol lookup over src/ffi/library.cpp."
+      - path: src/stdlib/dl/bind.cpp
+        purpose: "Bind a symbol plus a signature string into a callable :Fn via src/ffi/signature.cpp."
+    exports:
+      - "Open(path) -> handle, or raises"
+      - "Close(h) -> :Unit"
+      - "Symbol(h, name) -> :Some[ptr] | :None"
+      - "Bind(h, name, signature: :String) -> :Some[:Fn] | :None"
+    security:
+      - >
+        The highest-risk module in the library. Loading a library is arbitrary
+        code execution. ON1X_CAP_DL must be granted deliberately, is never part
+        of on1x_open_std, and the header says as much.
+      - "Every signature string is validated before a call is assembled. Malformed signatures return :None."
+
+# ---------------------------------------------------------------------------
+# Optional modules tied to build features
+# ---------------------------------------------------------------------------
+optional_modules:
+
+  - name: Sexp
+    dir: src/stdlib/sexp
+    capability: NONE
+    build_flag: ON1X_ENABLE_SEXP
+    depends_on: [src/sexp]
+    third_party: [sfsexp]
+    files:
+      - path: src/stdlib/sexp/sexp.cpp
+        purpose: "Parse and Write On1x values as s-expressions via src/sexp/writer.cpp."
+    exports:
+      - "Parse(s) -> :Some[value] | :None"
+      - "Write(v) -> :Some[:String] | :None"
+    notes:
+      - "Round-trip fidelity is limited to values with a literal form. Fn values are not serialisable and yield :None."
+
+  - name: Asm
+    dir: src/stdlib/asm
+    capability: ON1X_CAP_DL
+    build_flag: "ON1X_ENABLE_JIT AND ON1X_ENABLE_ASMTK"
+    depends_on: [src/jit]
+    third_party: [asmjit, asmtk]
+    files:
+      - path: src/stdlib/asm/asm.cpp
+        purpose: "Assemble a text block into an executable :Fn via src/jit/inline_asm.cpp."
+    exports:
+      - "Assemble(text: :String, signature: :String) -> :Some[:Fn] | :None"
+    security:
+      - "Equivalent in power to Dl. Gated behind the same capability and off by default."
+
+# ---------------------------------------------------------------------------
+# Modules written in On1x itself
+# ---------------------------------------------------------------------------
+embedded_sources:
+  dir: lib/on1x
+  rationale: >
+    Anything expressible in On1x without a performance penalty is written in
+    On1x. It doubles as a conformance corpus for the implementation.
+  build:
+    generator: tools/embed_sources.py
+    output: src/stdlib/embedded_sources.gen.cpp
+    note: "Generated. Never hand-edit. Regenerate when any lib/on1x/*.on1x file changes."
+  files:
+    - path: lib/on1x/prelude_ext.on1x
+      purpose: "Small conveniences over the prelude that need no native code."
+    - path: lib/on1x/opt.on1x
+      purpose: "Opt combinators, reference implementation. Native Opt must match it."
+    - path: lib/on1x/res.on1x
+      purpose: "Res combinators, reference implementation."
+    - path: lib/on1x/iter_ext.on1x
+      purpose: "Derived iterator adapters built on Iter.Next."
+    - path: lib/on1x/list_ext.on1x
+      purpose: "Derived List helpers (GroupBy, Tally, Scan)."
+    - path: lib/on1x/assert.on1x
+      purpose: "Assert, AssertEq, AssertRaises. Used by tests/, not installed by on1x_open_std."
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+tests:
+  dir: tests/stdlib
+  layout: "One directory per module, mirroring src/stdlib."
+  required:
+    - path: tests/stdlib/test_capability.cpp
+      covers: "Ungranted capability leaves the module absent, not present-and-failing."
+    - path: tests/stdlib/test_purity.cpp
+      covers: >
+        Every module declared pure installs and runs with all capabilities
+        revoked. Enforced by an interposer that fails the test on any syscall.
+    - path: tests/stdlib/test_no_nil.cpp
+      covers: "Every failing member of every module returns :None or raises. Never a sentinel."
+    - path: tests/stdlib/test_math_domain.cpp
+      covers: "Sqrt(-1), Log(0), Asin(2), DivMod(x, 0) all give :None."
+    - path: tests/stdlib/test_str_utf8.cpp
+      covers: "Codepoint indexing, multi-byte slicing, invalid UTF-8 rejection, surrogate handling."
+    - path: tests/stdlib/test_table_keys.cpp
+      covers: "List and Table keys rejected by FromEntries, Invert, Pick, Omit, Hash."
+    - path: tests/stdlib/test_iter_laziness.cpp
+      covers: "Adapters do not consume ahead; Take on an infinite iterator terminates."
+    - path: tests/stdlib/test_cmp_agreement.cpp
+      covers: "Cmp.Eq versus the == operator over a shared value corpus."
+    - path: tests/stdlib/test_res_effects.cpp
+      covers: "Res members consume '~' results correctly and never capture themselves."
+    - path: tests/stdlib/test_embedded_parity.cpp
+      covers: "Native Opt/Res/Iter match the lib/on1x reference implementations."
+    - path: tests/stdlib/test_arity_errors.cpp
+      covers: "Wrong arity and wrong argument type raise with a message naming the member."
+  conformance:
+    dir: tests/conformance/stdlib
+    purpose: "On1x-source test scripts run through the CLI, using lib/on1x/assert.on1x. Golden output via src/sexp."
+
+# ---------------------------------------------------------------------------
+# Build integration
+# ---------------------------------------------------------------------------
+build:
+  cmake:
+    - path: src/stdlib/CMakeLists.txt
+      purpose: "One object library per module; std_all links the pure set."
+    - path: lib/CMakeLists.txt
+      purpose: "Drives tools/embed_sources.py and its regeneration dependency."
+  options:
+    ON1X_STDLIB_PURE_ONLY:
+      default: OFF
+      effect: "Compile out every capability_modules entry. Used for sandboxed embeddings."
+    ON1X_STDLIB_DOCS:
+      default: ON
+      effect: "Embed per-member doc strings for the REPL. OFF shrinks the binary."
+    ON1X_ENABLE_FFI:
+      effect: "Gates Dl."
+    ON1X_ENABLE_JIT / ON1X_ENABLE_ASMTK:
+      effect: "Gates Asm."
+    ON1X_ENABLE_SEXP:
+      effect: "Gates Sexp."
+  exports:
+    note: >
+      Every on1x_open_<mod> symbol must be added to src/api/on1x.map. A module
+      that is not in the map is unreachable from a host.
+
+# ---------------------------------------------------------------------------
+# Decisions taken in this manifest
+# ---------------------------------------------------------------------------
+decisions:
+  - "Modules are Tables bound to a single global name. No import system in 0.1.0; the host installs what it wants."
+  - "Purity is the default and impurity is a declared capability, which is how spec §17's no-implicit-I/O rule is made structural rather than aspirational."
+  - "Domain and lookup failures return :None. Environmental failures raise so '~' can capture them. Programmer errors raise unconditionally."
+  - "Iterators and PRNG generators are Tagged Lists, so no new core type is introduced."
+  - "String indexing is codepoint-based, with byte access available but explicitly named."
+  - "Opt, Res, and Iter have both native and On1x-source implementations, checked against each other."
+
+# ---------------------------------------------------------------------------
+# Items this manifest assumes but could not confirm against SPECS.md 0.1.0
+# ---------------------------------------------------------------------------
+spec_gaps:
+  - question: "Int width and overflow behaviour (wrapping versus raising)."
+    affects: [Math.IntPow, Math.Abs, Bit.Shl, Bit.Sar]
+    assumed: "64-bit two's complement, wrapping. Bit shift counts >= width give :None."
+  - question: "Whether Int division by zero raises or returns an optional."
+    affects: [Math.DivMod]
+    assumed: "DivMod returns :None. The / operator's behaviour is the runtime's business, not the stdlib's."
+  - question: "Whether Iota half-open or inclusive for the two- and three-argument forms."
+    affects: [Iter.FromIota, List.New]
+    assumed: "Half-open, per §7. Confirm before writing Iter tests."
+  - question: "Whether a canonical Repr exists for Tables given unspecified iteration order."
+    affects: [Io.Repr, Sexp.Write]
+    assumed: "Repr sorts Table keys for determinism. Needs a spec sentence."
+  - question: "Whether Tags interned from arbitrary strings are permitted, and any character restrictions."
+    affects: [Str.ToTag, Tag.FromString]
+    assumed: "Permitted, matching the string-Tag literal form in §3.6."
+  - question: "Whether the sandbox root in src/runtime/sandbox.cpp is part of the public C API."
+    affects: [Fs]
+    assumed: "Yes, and Fs must honour it. Confirm before implementing Fs."
+
