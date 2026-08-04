@@ -1,0 +1,545 @@
+manifest: on1x-sources
+manifest_version: 1
+project:
+  name: on1x
+  spec_version: 0.1.0
+  language: C++20
+  public_abi: C11
+  artifacts:
+    - libon1x.so / libon1x.a      # embedding library, spec §16
+    - on1x                        # optional CLI/REPL host
+conventions:
+  installed_headers: include/on1x/**
+  private_headers: src/**/*.hpp      # never installed
+  one_directory_per_subsystem: true
+  no_exceptions_across_c_abi: true   # errors travel as :Error values, spec §16.6
+
+third_party:
+  dparser:
+    role: scannerless GLR parser generator for the EBNF in spec §17
+    integration: on1x.g compiled by make_dparser at build time
+  sfsexp:
+    role: s-expression reader/writer for AST/IR dumps, snapshot tests, data interchange
+  libgc:
+    role: tracing garbage collector backing all On1x objects, spec §16 memory model
+  asmjit:
+    role: baseline+optimizing JIT backend for hot On1x functions
+  asmtk:
+    role: assembly-text frontend for asmjit; inline-asm intrinsic and JIT patch/debug tooling
+  dyncall:
+    role: dynamic C calls and reverse callbacks for the FFI layer
+  dynalo:
+    role: cross-platform shared-library loading and symbol resolution
+
+files:
+
+  # ---------------------------------------------------------------- public API
+  - group: public C ABI
+    dir: include/on1x
+    entries:
+      - name: on1x.h
+        purpose: umbrella header; includes every public C header, spec §16
+      - name: on1x_config.h.in
+        purpose: configure-time feature toggles (JIT, FFI, sexp, threading)
+      - name: on1x_export.h
+        purpose: ON1X_API visibility and calling-convention macros
+      - name: on1x_version.h
+        purpose: version macros and on1x_version_string()
+      - name: on1x_types.h
+        purpose: on1x_State, on1x_Type, on1x_Ref, on1x_CFn, on1x_Status
+        spec: "§16.1"
+      - name: on1x_state.h
+        purpose: on1x_open, on1x_close, on1x_eval, chunk options
+        spec: "§16.2"
+      - name: on1x_stack.h
+        purpose: on1x_top, on1x_pop, on1x_dup, on1x_type, index normalization
+        spec: "§16.3"
+      - name: on1x_value.h
+        purpose: scalar push/read for Unit, Bool, Int, Float, String, Tag
+        spec: "§16.3, §16.4"
+      - name: on1x_list.h
+        purpose: on1x_new_list, on1x_list_push, on1x_list_get, on1x_len
+      - name: on1x_table.h
+        purpose: on1x_new_table, on1x_table_set, on1x_table_get, key-hashability rules
+        spec: "§6.2"
+      - name: on1x_tag.h
+        purpose: on1x_tag_list, on1x_tag_of, on1x_payload_of
+        spec: "§6.3"
+      - name: on1x_optional.h
+        purpose: C constructors/readers for :Some and :None
+        spec: "§8"
+      - name: on1x_result.h
+        purpose: C constructors/readers for :Success and :Error payloads
+        spec: "§9"
+      - name: on1x_call.h
+        purpose: on1x_register, on1x_call, native argc/result protocol
+        spec: "§16.5"
+      - name: on1x_error.h
+        purpose: on1x_error, error introspection, last-error slot access
+        spec: "§16.6"
+      - name: on1x_gc.h
+        purpose: rooted handle create/release, GC hints, collection control
+      - name: on1x_ffi.h
+        purpose: host-facing FFI surface (load library, bind symbol by signature)
+
+  - group: public C++ facade
+    dir: include/on1x
+    entries:
+      - name: on1x.hpp
+        purpose: umbrella C++ header
+      - name: state.hpp
+        purpose: RAII State wrapper over on1x_State with move-only semantics
+      - name: value.hpp
+        purpose: Value handle; TypeOf-driven accessors returning std::optional
+      - name: list.hpp
+        purpose: List view with iterators and range support
+      - name: table.hpp
+        purpose: Table view, key iteration, Get/Set helpers
+      - name: tag.hpp
+        purpose: interned Tag wrapper, compile-time tag literals
+      - name: optional.hpp
+        purpose: bridge between :Some/:None and std::optional
+      - name: result.hpp
+        purpose: bridge between :Success/:Error and a Result<T> type
+      - name: native.hpp
+        purpose: template glue binding arbitrary C++ callables as on1x_CFn
+      - name: rooted.hpp
+        purpose: scoped GC root guard for C++ hosts
+      - name: eval.hpp
+        purpose: convenience chunk evaluation returning Result<Value>
+  - group: build glue
+    dir: include
+    entries:
+      - name: CMakeLists.txt
+        purpose: header target, install rules, on1x_config.h generation
+
+  # ------------------------------------------------------------------- utility
+  - group: utilities
+    dir: src/util
+    entries:
+      - name: arena.hpp / arena.cpp
+        purpose: bump allocator for AST and IR nodes
+      - name: small_vector.hpp
+        purpose: inline-capacity vector for operand and argument lists
+      - name: hash.hpp / hash.cpp
+        purpose: wyhash/FNV primitives for tag interning and table hashing
+      - name: utf8.hpp / utf8.cpp
+        purpose: UTF-8 validation, decoding, \u{XXXX} handling
+        spec: "§3.1, §3.6"
+      - name: span.hpp
+        purpose: minimal non-owning span for pre-C++20-lite builds
+      - name: bitops.hpp
+        purpose: pointer tagging and NaN-box bit helpers
+      - name: assert.hpp / panic.cpp
+        purpose: internal invariants; never crosses the C ABI
+      - name: platform.hpp / platform.cpp
+        purpose: OS/arch detection, page size, thread-local storage
+      - name: string_builder.hpp / string_builder.cpp
+        purpose: rope-free concatenation buffer for String ops
+      - name: CMakeLists.txt
+        purpose: object library target
+
+  # ------------------------------------------------------------------------ gc
+  - group: garbage collector
+    dir: src/gc
+    uses: [libgc]
+    entries:
+      - name: gc.hpp / gc.cpp
+        purpose: GC_INIT wrapper, collector configuration, statistics
+      - name: alloc.hpp / alloc.cpp
+        purpose: typed allocation (GC_MALLOC vs GC_MALLOC_ATOMIC for strings/code)
+      - name: object_header.hpp
+        purpose: shared object header with kind byte and forwarding bits
+      - name: roots.hpp / roots.cpp
+        purpose: value-stack and global-env root registration
+        spec: "§16.3"
+      - name: shadow_stack.hpp / shadow_stack.cpp
+        purpose: explicit root list for JIT frames where conservative scanning is unsafe
+      - name: handle_table.hpp / handle_table.cpp
+        purpose: rooted handles for host code holding values across calls
+      - name: finalizer.cpp
+        purpose: finalizers for FFI resources and loaded libraries
+      - name: CMakeLists.txt
+        purpose: object library target
+
+  # ---------------------------------------------------------------- value model
+  - group: core value model
+    dir: src/core
+    entries:
+      - name: value.hpp / value.cpp
+        purpose: Value representation (NaN-boxed 64-bit) and type predicates
+        spec: "§4.1"
+      - name: type.hpp / type.cpp
+        purpose: on1x_Type mapping and TypeOf returning a type Tag
+        spec: "§4.1"
+      - name: tag_table.hpp / tag_table.cpp
+        purpose: global interning table for Tags; identity equality
+        spec: "§4.3"
+      - name: string.hpp / string.cpp
+        purpose: immutable UTF-8 string object, byte indexing, concatenation
+        spec: "§5"
+      - name: list.hpp / list.cpp
+        purpose: growable heterogeneous array, zero-based access
+        spec: "§6.1"
+      - name: table.hpp / table.cpp
+        purpose: open-addressing map; rejects List/Table keys as unhashable
+        spec: "§6.2"
+      - name: tagged_list.hpp / tagged_list.cpp
+        purpose: constructor tag plus payload; TagOf, PayloadOf
+        spec: "§6.3"
+      - name: optional.hpp / optional.cpp
+        purpose: :Some/:None construction, IsSome, IsNone, Unwrap, UnwrapOr
+        spec: "§8"
+      - name: result.hpp / result.cpp
+        purpose: :Success/:Error construction with optional payloads
+        spec: "§9"
+      - name: iota.hpp / iota.cpp
+        purpose: Iota value, range generation, :None on non-positive/non-integer input
+        spec: "§7"
+      - name: number.hpp / number.cpp
+        purpose: wrapping Int arithmetic, Int/Float promotion, division rules
+        spec: "§5, §12"
+      - name: equality.cpp
+        purpose: structural equality for List/Table, cross-type numeric compare
+        spec: "§4.3"
+      - name: hashing.cpp
+        purpose: hashable-key hashing for scalars and Tags
+      - name: tostring.cpp
+        purpose: canonical textual rendering of every value kind
+      - name: reserved_tags.hpp / reserved_tags.cpp
+        purpose: pre-interned :Unit … :Iota, :Some, :None, :Success, :Error
+        spec: "§18.1"
+      - name: CMakeLists.txt
+        purpose: object library target
+
+  # -------------------------------------------------------------------- syntax
+  - group: grammar and parser
+    dir: src/syntax
+    uses: [dparser]
+    entries:
+      - name: grammar/on1x.g
+        purpose: dparser grammar transcribing the EBNF in spec §17
+        spec: "§17"
+      - name: grammar/on1x.g.d_parser.c
+        purpose: GENERATED by make_dparser at build time; not checked in
+        generated: true
+      - name: grammar/README.md
+        purpose: notes on ambiguity resolution and dparser priorities
+      - name: parser.hpp / parser.cpp
+        purpose: dparser driver, table binding, syntax-error reporting
+      - name: ast.hpp / ast.cpp
+        purpose: arena-allocated AST node definitions for every production
+      - name: ast_builder.hpp / ast_builder.cpp
+        purpose: dparser reduction actions building AST nodes
+      - name: literals.hpp / literals.cpp
+        purpose: decode 0x/0b/0o/underscore ints, floats, string escapes, Tags
+        spec: "§3.6"
+      - name: terminators.hpp / terminators.cpp
+        purpose: newline/semicolon termination and bracket/operator continuation
+        spec: "§3.3"
+      - name: keywords.hpp / keywords.cpp
+        purpose: reserved word table and identifier validation
+        spec: "§3.4, §3.5"
+      - name: precedence.hpp
+        purpose: operator precedence and associativity table
+        spec: "§12"
+      - name: source_map.hpp / source_map.cpp
+        purpose: chunk names, byte offsets, line/column spans
+      - name: diagnostics.hpp / diagnostics.cpp
+        purpose: compile-time diagnostic collection and formatting
+      - name: ast_printer.cpp
+        purpose: human-readable AST dump for debugging
+      - name: CMakeLists.txt
+        purpose: custom command for make_dparser plus object library
+
+  # ------------------------------------------------------------------ semantics
+  - group: static checks
+    dir: src/sema
+    entries:
+      - name: resolver.hpp / resolver.cpp
+        purpose: lexical scope resolution, let bindings, shadowing, upvalue capture
+        spec: "§10"
+      - name: effect_scope.hpp / effect_scope.cpp
+        purpose: validates that '~' is only read inside the follower statement
+        spec: "§9"
+      - name: enum_check.cpp
+        purpose: enum member validation and Iota counter scoping
+        spec: "§6.4, §7"
+      - name: pattern_check.hpp / pattern_check.cpp
+        purpose: pattern well-formedness, binding uniqueness, tail-pattern rules
+        spec: "§14"
+      - name: assign_check.cpp
+        purpose: distinguishes let from reassignment; rejects uninitialized let
+        spec: "§10"
+      - name: const_fold.cpp
+        purpose: literal folding before lowering
+      - name: CMakeLists.txt
+        purpose: object library target
+
+  # ------------------------------------------------------------------------ ir
+  - group: intermediate representation
+    dir: src/ir
+    entries:
+      - name: ir.hpp / ir.cpp
+        purpose: register-based IR instructions, basic blocks, functions
+      - name: builder.hpp / builder.cpp
+        purpose: IR construction helpers
+      - name: lower_ast.hpp / lower_ast.cpp
+        purpose: AST to IR lowering, including desugaring of '..' to Iota and '.' to Get
+        spec: "§12"
+      - name: lower_match.cpp
+        purpose: decision-tree compilation of match arms
+        spec: "§14"
+      - name: lower_effect.cpp
+        purpose: lowers '~ expr' into capture + Success/Error construction
+        spec: "§9"
+      - name: cfg.hpp / cfg.cpp
+        purpose: control-flow graph, dominators for the JIT tier
+      - name: passes/dce.cpp
+        purpose: dead code elimination
+      - name: passes/copy_prop.cpp
+        purpose: copy and constant propagation
+      - name: passes/inline.cpp
+        purpose: small-function inlining
+      - name: verifier.cpp
+        purpose: IR invariant checking under debug builds
+      - name: CMakeLists.txt
+        purpose: object library target
+
+  # ------------------------------------------------------------------ bytecode
+  - group: bytecode and VM
+    dir: src/vm
+    entries:
+      - name: opcode.hpp
+        purpose: opcode enumeration and operand encoding
+      - name: chunk.hpp / chunk.cpp
+        purpose: compiled chunk: code, constants, debug line table
+      - name: emitter.hpp / emitter.cpp
+        purpose: IR to bytecode emission and jump patching
+      - name: disassembler.cpp
+        purpose: bytecode listing for debugging
+      - name: interpreter.hpp / interpreter.cpp
+        purpose: dispatch loop (computed goto where available)
+      - name: frame.hpp / frame.cpp
+        purpose: call frames, register windows, GC root exposure
+      - name: dispatch_table.inc
+        purpose: generated dispatch table include
+      - name: CMakeLists.txt
+        purpose: object library target
+
+  # ----------------------------------------------------------------------- jit
+  - group: JIT backend
+    dir: src/jit
+    uses: [asmjit, asmtk]
+    entries:
+      - name: jit.hpp / jit.cpp
+        purpose: tier-up policy, compilation entry point, asmjit JitRuntime ownership
+      - name: profile.hpp / profile.cpp
+        purpose: invocation and loop-back-edge counters driving tier-up
+      - name: compiler.hpp / compiler.cpp
+        purpose: IR to asmjit::BaseCompiler translation, arch-independent portion
+      - name: emit_x86.cpp
+        purpose: x86-64 specific emission and calling convention details
+      - name: emit_a64.cpp
+        purpose: AArch64 specific emission
+      - name: type_guards.cpp
+        purpose: value-type guard emission with deoptimization side exits
+      - name: deopt.hpp / deopt.cpp
+        purpose: side-exit metadata and reconstruction of interpreter frames
+      - name: stubs.hpp / stubs.cpp
+        purpose: runtime call stubs (allocate, table_get, tag_of, raise)
+      - name: gc_interface.cpp
+        purpose: spill-slot maps and shadow-stack updates so libgc sees JIT-held values
+      - name: code_cache.hpp / code_cache.cpp
+        purpose: generated code ownership, invalidation, unwind registration
+      - name: inline_asm.hpp / inline_asm.cpp
+        purpose: asmtk-backed assembly-text parsing for the inline-asm host intrinsic
+        uses: [asmtk]
+      - name: asm_repl.cpp
+        purpose: developer tool assembling text snippets against a live state
+        uses: [asmtk]
+      - name: CMakeLists.txt
+        purpose: object library target, gated by ON1X_ENABLE_JIT
+
+  # ------------------------------------------------------------------- runtime
+  - group: runtime core
+    dir: src/runtime
+    entries:
+      - name: state.hpp / state.cpp
+        purpose: on1x_State internals: globals, value stack, error slot, GC roots, tag table
+        spec: "§15, §16.2"
+      - name: stack.hpp / stack.cpp
+        purpose: 1-based and negative index handling, growth, slot invariants
+        spec: "§16.3"
+      - name: env.hpp / env.cpp
+        purpose: lexical environments, global environment, chunk-to-chunk visibility
+        spec: "§10, §15"
+      - name: closure.hpp / closure.cpp
+        purpose: :Fn objects for both On1x closures and native functions
+        spec: "§11"
+      - name: call.hpp / call.cpp
+        purpose: call protocol, arity handling, `rest..` variadic packing
+        spec: "§11"
+      - name: effect.hpp / effect.cpp
+        purpose: '~' capture boundary, Success/Error wrapping, follower-statement binding
+        spec: "§9"
+      - name: raise.hpp / raise.cpp
+        purpose: internal unwinding and error payload construction
+        spec: "§16.6"
+      - name: pattern_match.cpp
+        purpose: runtime pattern execution; raises on non-exhaustive match
+        spec: "§14"
+      - name: enum_eval.cpp
+        purpose: enum block evaluation producing a Tag-to-Int Table
+        spec: "§6.4"
+      - name: iterate.cpp
+        purpose: for-loop iteration over List, Table keys, and ranges
+        spec: "§13"
+      - name: field_access.cpp
+        purpose: x.field sugar over Get with raise-on-missing semantics
+        spec: "§12"
+      - name: operators.cpp
+        purpose: arithmetic, comparison, and String concatenation dispatch
+        spec: "§12"
+      - name: sandbox.cpp
+        purpose: enforces absence of implicit I/O; capability registration audit
+        spec: "§15"
+      - name: CMakeLists.txt
+        purpose: object library target
+
+  - group: prelude
+    dir: src/prelude
+    entries:
+      - name: prelude.hpp / prelude.cpp
+        purpose: registration of the standard prelude into a fresh state
+        spec: "§18.2"
+      - name: introspect.cpp
+        purpose: TypeOf, TagOf, PayloadOf
+      - name: sequence.cpp
+        purpose: Len, Get, Set, Push, Pop
+      - name: table_ops.cpp
+        purpose: Keys, Values
+      - name: iota_builtin.cpp
+        purpose: Iota callable forms and the :None cases
+        spec: "§7"
+      - name: optional_ops.cpp
+        purpose: IsSome, IsNone, Unwrap, UnwrapOr
+        spec: "§8"
+      - name: result_ops.cpp
+        purpose: IsSuccess, IsError
+        spec: "§9"
+      - name: string_ops.cpp
+        purpose: string helpers available to hosts that opt in
+      - name: CMakeLists.txt
+        purpose: object library target
+
+  # ----------------------------------------------------------------------- ffi
+  - group: foreign function interface
+    dir: src/ffi
+    uses: [dyncall, dynalo]
+    entries:
+      - name: ffi.hpp / ffi.cpp
+        purpose: FFI subsystem lifecycle and per-state VM handle
+      - name: signature.hpp / signature.cpp
+        purpose: signature string parsing and On1x-to-C type mapping
+      - name: marshal.hpp / marshal.cpp
+        purpose: argument and return marshalling, including :Some/:None handling
+      - name: dyncall_bridge.cpp
+        purpose: builds dyncall call VMs and invokes native symbols
+        uses: [dyncall]
+      - name: dyncall_callback.cpp
+        purpose: exposes On1x :Fn values as C function pointers via dyncallback
+        uses: [dyncall]
+      - name: dynalo_loader.hpp / dynalo_loader.cpp
+        purpose: shared-library loading, symbol resolution, lifetime tracking
+        uses: [dynalo]
+      - name: native_adapter.cpp
+        purpose: on1x_CFn adapter, argc checking, error propagation
+        spec: "§16.5"
+      - name: library_registry.cpp
+        purpose: dedup loaded libraries, GC finalizer-driven unload
+      - name: CMakeLists.txt
+        purpose: object library target, gated by ON1X_ENABLE_FFI
+
+  # ---------------------------------------------------------------------- sexp
+  - group: s-expression IO
+    dir: src/sexp
+    uses: [sfsexp]
+    entries:
+      - name: sexp.hpp / sexp.cpp
+        purpose: sfsexp wrapper, parser/continuation lifetime management
+      - name: reader.cpp
+        purpose: s-expression text to On1x values (Lists, Tables, Tags, scalars)
+      - name: writer.cpp
+        purpose: On1x values to s-expression text, cycle-safe
+      - name: ast_dump.cpp
+        purpose: AST to s-expression for tooling and snapshot tests
+      - name: ir_dump.cpp
+        purpose: IR and bytecode to s-expression for golden-file tests
+      - name: CMakeLists.txt
+        purpose: object library target, gated by ON1X_ENABLE_SEXP
+
+  # ----------------------------------------------------------------- C ABI impl
+  - group: C ABI implementation
+    dir: src/api
+    entries:
+      - name: api_common.hpp / api_common.cpp
+        purpose: index normalization, argument checks, no-throw boundary guards
+      - name: api_state.cpp
+        purpose: on1x_open, on1x_close, on1x_eval
+        spec: "§16.2"
+      - name: api_stack.cpp
+        purpose: on1x_top, on1x_pop, on1x_dup, on1x_type
+        spec: "§16.3"
+      - name: api_value.cpp
+        purpose: scalar push and as_* accessors
+        spec: "§16.3, §16.4"
+      - name: api_list.cpp
+        purpose: list construction, mutation, indexed read
+      - name: api_table.cpp
+        purpose: table construction, set, get
+      - name: api_tag.cpp
+        purpose: tag_list, tag_of, payload_of
+        spec: "§6.3"
+      - name: api_optional.cpp
+        purpose: :Some/:None C surface
+      - name: api_result.cpp
+        purpose: :Success/:Error C surface
+      - name: api_call.cpp
+        purpose: on1x_register, on1x_call with '~'-equivalent semantics
+        spec: "§16.5"
+      - name: api_error.cpp
+        purpose: on1x_error and error inspection
+        spec: "§16.6"
+      - name: api_gc.cpp
+        purpose: rooted handle and collection control surface
+      - name: api_ffi.cpp
+        purpose: host-facing FFI entry points
+      - name: api_version.cpp
+        purpose: version reporting
+      - name: on1x.map
+        purpose: linker version script restricting exports to on1x_*
+      - name: CMakeLists.txt
+        purpose: object library target
+
+  # ------------------------------------------------------------------- CLI host
+  - group: reference host
+    dir: src/tools
+    entries:
+      - name: on1x_main.cpp
+        purpose: CLI entry point; evaluates files or stdin
+      - name: repl.hpp / repl.cpp
+        purpose: line-oriented REPL honoring the statement-terminator rules
+      - name: host_prelude.cpp
+        purpose: registers Print and other capabilities the core omits
+        spec: "§15, §18.2"
+      - name: dump_tool.cpp
+        purpose: --dump-ast / --dump-ir / --dump-bytecode driver
+      - name: CMakeLists.txt
+        purpose: executable target
+
+  - group: root build
+    dir: src
+    entries:
+      - name: CMakeLists.txt
+        purpose: aggregates object libraries into libon1x, wires third-party targets
