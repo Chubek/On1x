@@ -1,0 +1,6 @@
+ON1X_0.1 {
+  global:
+    on1x_*;
+  local:
+    *;
+};

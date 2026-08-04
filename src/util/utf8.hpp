@@ -18,6 +18,17 @@ struct DecodeResult {
     std::string_view text,
     std::size_t offset,
     DecodeResult& result) noexcept;
+[[nodiscard]] bool codepoint_count(
+    std::string_view text,
+    std::size_t& count) noexcept;
+[[nodiscard]] bool byte_offset_for_codepoint(
+    std::string_view text,
+    std::size_t index,
+    std::size_t& offset) noexcept;
+[[nodiscard]] bool decode_codepoint_at(
+    std::string_view text,
+    std::size_t index,
+    DecodeResult& result) noexcept;
 [[nodiscard]] bool append(std::string& output, char32_t code_point);
 
 }

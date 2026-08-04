@@ -9,6 +9,7 @@ add_library(on1x_util STATIC
 
 target_include_directories(on1x_util PUBLIC "${PROJECT_SOURCE_DIR}/src")
 target_compile_features(on1x_util PUBLIC cxx_std_20)
+target_link_libraries(on1x_util PUBLIC utf8proc)
 
 if(MSVC)
   target_compile_options(on1x_util PRIVATE /W4 /permissive-)

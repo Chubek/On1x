@@ -80,7 +80,7 @@ files:
       - name: on1x_gc.h
         purpose: rooted handle create/release, GC hints, collection control
       - name: on1x_ffi.h
-        purpose: host-facing FFI surface (load library, bind symbol by signature)
+        purpose: feature-gated dyncall host FFI: library open/close, symbol lookup, and restricted scalar calls by signature
 
   - group: public C++ facade
     dir: include/on1x
@@ -439,11 +439,11 @@ files:
     uses: [dyncall, dynalo]
     entries:
       - name: ffi.hpp / ffi.cpp
-        purpose: FFI subsystem lifecycle and per-state VM handle
+        purpose: dyncall call-VM lifecycle and validated direct scalar invocation
       - name: signature.hpp / signature.cpp
-        purpose: signature string parsing and On1x-to-C type mapping
+        purpose: restricted dyncall signature parsing and On1x-to-C scalar type mapping
       - name: marshal.hpp / marshal.cpp
-        purpose: argument and return marshalling, including :Some/:None handling
+        purpose: scalar argument and return marshalling; malformed signatures become :None at the C API boundary
       - name: dyncall_bridge.cpp
         purpose: builds dyncall call VMs and invokes native symbols
         uses: [dyncall]
@@ -514,7 +514,7 @@ files:
       - name: api_gc.cpp
         purpose: rooted handle and collection control surface
       - name: api_ffi.cpp
-        purpose: host-facing FFI entry points
+        purpose: host-facing FFI entry points; malformed signatures push :None and environmental/native failures push :Error
       - name: api_version.cpp
         purpose: version reporting
       - name: on1x.map

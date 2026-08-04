@@ -97,6 +97,17 @@ void test_utf8() {
     CHECK(result.code_point == U'\u00A2');
     CHECK(result.width == 2);
 
+    std::size_t count = 0;
+    std::size_t offset = 0;
+    CHECK(on1x::utf8::codepoint_count(text, count));
+    CHECK(count == 4);
+    CHECK(on1x::utf8::byte_offset_for_codepoint(text, 3, offset));
+    CHECK(offset == 6);
+    CHECK(on1x::utf8::decode_codepoint_at(text, 3, result));
+    CHECK(result.code_point == U'\U0001F600');
+    CHECK(!on1x::utf8::decode_codepoint_at(text, 4, result));
+    CHECK(!on1x::utf8::codepoint_count("\xED\xA0\x80", count));
+
     std::string encoded;
     CHECK(on1x::utf8::append(encoded, U'\U0001F600'));
     CHECK(encoded == "\xF0\x9F\x98\x80");
