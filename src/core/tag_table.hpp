@@ -16,9 +16,12 @@ class TagTable {
 public:
     TagTable() = default;
     [[nodiscard]] TagObject* intern(GcState* gc, std::string_view text);
+    void root() noexcept;
+    void unroot() noexcept;
 
 private:
     TagObject* head_ = nullptr;
+    bool rooted_ = false;
 };
 
 [[nodiscard]] std::string_view tag_text(const TagObject* tag) noexcept;

@@ -1,4 +1,9 @@
 add_library(on1x_stdlib STATIC
+  cmp/cmp.cpp
+  math/math.cpp
+  bit/bit.cpp
+  tag/tag.cpp
+  str/str.cpp
   capability.cpp
   module.cpp
   registry.cpp

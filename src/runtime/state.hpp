@@ -7,6 +7,7 @@
 #include "core/value.hpp"
 #include "gc/gc.hpp"
 #include "gc/handle_table.hpp"
+#include "gc/roots.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -44,6 +45,7 @@ struct On1x_State {
     std::size_t api_frame_base = 0;
     bool api_frame_active = false;
     on1x::GcHandleTable handles;
+    on1x::GcRootVector persistent_roots;
     on1x::ApiReference* references = nullptr;
     std::uint32_t capabilities = 0;
 

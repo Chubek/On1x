@@ -25,6 +25,7 @@ bool register_native(On1x_State* state, const NativeDefinition& definition) {
     GcRoot name_root(name);
     auto* function = runtime::new_native_function(&state->gc, definition.function);
     GcRoot function_root(function);
+    state->persistent_roots.push(function);
     return table_set(
         &state->gc, globals, value_from_object(name), value_from_object(function));
 }

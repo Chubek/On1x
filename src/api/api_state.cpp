@@ -17,13 +17,32 @@ On1x_State* on1x_open(void) {
     try {
         auto* state = new On1x_State;
         on1x::gc_init(&state->gc);
+        state->tags.root();
+        GC_add_roots(&state->stack, &state->stack + 1);
         state->reserved = on1x::make_reserved_tags(&state->gc, state->tags);
         state->globals = on1x::new_table(&state->gc);
         if (!on1x::prelude::install(state)) {
+            GC_remove_roots(&state->stack, &state->stack + 1);
+            state->tags.unroot();
             on1x::gc_shutdown(&state->gc);
             delete state;
             return nullptr;
         }
+        state->persistent_roots.push(state->globals);
+        state->persistent_roots.push(state->reserved.unit);
+        state->persistent_roots.push(state->reserved.boolean);
+        state->persistent_roots.push(state->reserved.integer);
+        state->persistent_roots.push(state->reserved.floating);
+        state->persistent_roots.push(state->reserved.string);
+        state->persistent_roots.push(state->reserved.tag);
+        state->persistent_roots.push(state->reserved.list);
+        state->persistent_roots.push(state->reserved.table);
+        state->persistent_roots.push(state->reserved.function);
+        state->persistent_roots.push(state->reserved.iota);
+        state->persistent_roots.push(state->reserved.some);
+        state->persistent_roots.push(state->reserved.none);
+        state->persistent_roots.push(state->reserved.success);
+        state->persistent_roots.push(state->reserved.error);
         return state;
     } catch (...) {
         return nullptr;
@@ -33,7 +52,9 @@ On1x_State* on1x_open(void) {
 void on1x_close(On1x_State* state) {
     if (!state) return;
     on1x::release_api_references(state);
+    GC_remove_roots(&state->stack, &state->stack + 1);
     on1x::gc_shutdown(&state->gc);
+    state->tags.unroot();
     delete state;
 }
 

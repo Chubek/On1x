@@ -26,6 +26,58 @@ On1x_Status broken_native(On1x_State*, int) {
 int main() {
     On1x_State* state = on1x_open();
     CHECK(state != nullptr);
+    CHECK(on1x_open_std(state) == ON1X_OK);
+    const char* math_chunk = "Math.Sqrt(-1)";
+    CHECK(on1x_eval(state, math_chunk, std::strlen(math_chunk), "test") == ON1X_OK);
+    CHECK(on1x_is_none(state, -1));
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* bit_chunk = "Bit.Test(8, 3)";
+    CHECK(on1x_eval(state, bit_chunk, std::strlen(bit_chunk), "test") == ON1X_OK);
+    CHECK(on1x_is_some(state, -1));
+    CHECK(on1x_payload_of(state, -1) == 1 && on1x_list_get(state, -1, 0) == 1);
+    CHECK(on1x_as_bool(state, -1) == 1);
+    CHECK(on1x_pop(state, 3) == 1);
+    const char* tag_chunk = "Tag.Name(:point)";
+    CHECK(on1x_eval(state, tag_chunk, std::strlen(tag_chunk), "test") == ON1X_OK);
+    size_t length = 0;
+    CHECK(std::strcmp(on1x_as_string(state, -1, &length), "point") == 0 && length == 5);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* str_chunk = "Str.CharLen(\"é\")";
+    CHECK(on1x_eval(state, str_chunk, std::strlen(str_chunk), "test") == ON1X_OK);
+    CHECK(on1x_as_int(state, -1) == 1);
+    CHECK(on1x_pop(state, 1) == 1);
+    on1x_gc_collect(state);
+    const char* native_after_gc_chunk = "IsNone(?)";
+    CHECK(on1x_eval(
+        state, native_after_gc_chunk, std::strlen(native_after_gc_chunk), "test") == ON1X_OK);
+    CHECK(on1x_as_bool(state, -1) == 1);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* cmp_eq_chunk = "Cmp.Eq([1, %{ :x => 2 }], [1, %{ :x => 2 }])";
+    CHECK(on1x_eval(
+        state, cmp_eq_chunk, std::strlen(cmp_eq_chunk), "test") == ON1X_OK);
+    CHECK(on1x_as_bool(state, -1) == 1);
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* cmp_compare_chunk = "Cmp.Compare(1, 2)";
+    CHECK(on1x_eval(
+        state, cmp_compare_chunk, std::strlen(cmp_compare_chunk), "test") == ON1X_OK);
+    CHECK(on1x_is_some(state, -1));
+    CHECK(on1x_payload_of(state, -1) == 1 && on1x_list_get(state, -1, 0) == 1);
+    CHECK(on1x_as_int(state, -1) == -1);
+    CHECK(on1x_pop(state, 3) == 1);
+    const char* cmp_hash_chunk = "Cmp.Hash([1])";
+    CHECK(on1x_eval(state, cmp_hash_chunk, std::strlen(cmp_hash_chunk), "test") == ON1X_OK);
+    CHECK(on1x_is_none(state, -1));
+    CHECK(on1x_pop(state, 1) == 1);
+    const char* cmp_min_chunk = "Cmp.MinOf([3, 1, 2])";
+    CHECK(on1x_eval(state, cmp_min_chunk, std::strlen(cmp_min_chunk), "test") == ON1X_OK);
+    CHECK(on1x_is_some(state, -1));
+    CHECK(on1x_payload_of(state, -1) == 1 && on1x_list_get(state, -1, 0) == 1);
+    CHECK(on1x_as_int(state, -1) == 1);
+    CHECK(on1x_pop(state, 3) == 1);
+    const char* cmp_max_chunk = "Cmp.MaxOf([])";
+    CHECK(on1x_eval(state, cmp_max_chunk, std::strlen(cmp_max_chunk), "test") == ON1X_OK);
+    CHECK(on1x_is_none(state, -1));
+    CHECK(on1x_pop(state, 1) == 1);
     on1x_push_int(state, 42);
     CHECK(on1x_top(state) == 1);
     CHECK(on1x_type(state, -1) == ON1X_INT);
@@ -33,7 +85,6 @@ int main() {
     CHECK(on1x_dup(state, -1) == ON1X_OK);
     CHECK(on1x_pop(state, 2) == 1 && on1x_top(state) == 0);
     CHECK(on1x_eval(state, "\"ok\"", 4, "test") == ON1X_OK);
-    size_t length = 0;
     CHECK(std::strcmp(on1x_as_string(state, -1, &length), "ok") == 0 && length == 2);
     CHECK(on1x_pop(state, 1) == 1);
     CHECK(on1x_eval(state, "1+2", 3, "test") == ON1X_OK);

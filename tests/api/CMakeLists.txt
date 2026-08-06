@@ -1,6 +1,13 @@
 add_executable(on1x_api_tests api_tests.cpp)
 target_link_libraries(on1x_api_tests PRIVATE on1x)
 target_include_directories(on1x_api_tests PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
+add_executable(on1x_public_headers_c11 public_headers_c11.c)
+target_link_libraries(on1x_public_headers_c11 PRIVATE on1x_headers)
+
+add_executable(on1x_public_headers_cpp20 public_headers_cpp20.cpp)
+target_link_libraries(on1x_public_headers_cpp20 PRIVATE on1x_headers)
+
 if(ON1X_ENABLE_FFI)
   target_compile_definitions(on1x_api_tests PRIVATE ON1X_TEST_EXPECT_FFI=1)
   add_executable(on1x_ffi_tests ffi_tests.cpp)
@@ -9,3 +16,5 @@ if(ON1X_ENABLE_FFI)
   add_test(NAME on1x_ffi_tests COMMAND on1x_ffi_tests)
 endif()
 add_test(NAME on1x_api_tests COMMAND on1x_api_tests)
+add_test(NAME on1x_public_headers_c11 COMMAND on1x_public_headers_c11)
+add_test(NAME on1x_public_headers_cpp20 COMMAND on1x_public_headers_cpp20)
