@@ -11,7 +11,7 @@ pikorl_plugin_initialize (picorl::PluginHost *host,
   *descriptor = {
     picorl::plugin_abi_version,
     "hello-plugin",
-    "0.1.0",
+    "1.0.0",
     "Minimal PikoRL plugin example"
   };
   return host->register_command != nullptr

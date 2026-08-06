@@ -13,7 +13,7 @@ This document defines the initial Podlet runtime contract and `.qpod` shape, imp
 Podlet manifest is a string map with required keys:
 
 - `name`: package identifier (e.g. `hello_podlet`)
-- `version`: semantic or project version string (e.g. `0.1.0`)
+- `version`: semantic or project version string (e.g. `1.0.0`)
 - `entrypoint`: file key that must exist in archive `files` map (e.g. `Podlet.cpp`)
 
 Optional keys:

@@ -21,7 +21,7 @@ static On1x_Status bad(On1x_State* s, const char* m) noexcept {
 }
 
 // Breakdown(ts: :Int) -> :Table with :Year :Month :Day :Hour :Minute :Second :Weekday
-// UTC only in 0.1.0.
+// UTC only in 1.0.0.
 On1x_Status time_breakdown(On1x_State* s, int argc) noexcept {
     if (!require_arity(s, argc, 1, "Time.Breakdown")) return ON1X_ERR;
     Value v;

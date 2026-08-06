@@ -195,7 +195,7 @@ modules:
       - "IsValidUtf8(s) -> :Bool ; FromCodepoint(n: :Int) -> :Some[:String] | :None"
     decisions:
       - "Indices are codepoint-based everywhere except ByteLen/Bytes. Splitting a codepoint is not representable."
-      - "Case mapping is ASCII-only in 0.1.0. Full Unicode casing is deferred and documented as such."
+      - "Case mapping is ASCII-only in 1.0.0. Full Unicode casing is deferred and documented as such."
       - "Format uses {} positional holes and {{ }} escapes; no implicit stringification of Lists or Tables."
 
   - name: List
@@ -497,7 +497,7 @@ capability_modules:
       - "Breakdown(ts: :Int) -> :Table with :Year :Month :Day :Hour :Minute :Second :Weekday"
       - "Format(ts, fmt) -> :Some[:String] | :None ; Parse(s) -> :Some[:Int] | :None"
     decisions:
-      - "UTC only in 0.1.0. Local-time conversion is deferred; the header says so explicitly."
+      - "UTC only in 1.0.0. Local-time conversion is deferred; the header says so explicitly."
 
   - name: Rand
     dir: src/stdlib/rand
@@ -520,7 +520,7 @@ capability_modules:
         The generator is pure and capability-free because the host supplies the
         seed. Only entropy acquisition is gated. This keeps deterministic
         replay possible in a sandbox.
-      - "Not cryptographically secure. Stated in the header; no crypto module in 0.1.0."
+      - "Not cryptographically secure. Stated in the header; no crypto module in 1.0.0."
 
   - name: Dl
     dir: src/stdlib/dl
@@ -672,7 +672,7 @@ build:
 # Decisions taken in this manifest
 # ---------------------------------------------------------------------------
 decisions:
-  - "Modules are Tables bound to a single global name. No import system in 0.1.0; the host installs what it wants."
+  - "Modules are Tables bound to a single global name. No import system in 1.0.0; the host installs what it wants."
   - "Purity is the default and impurity is a declared capability, which is how spec §17's no-implicit-I/O rule is made structural rather than aspirational."
   - "Domain and lookup failures return :None. Environmental failures raise so '~' can capture them. Programmer errors raise unconditionally."
   - "Iterators and PRNG generators are Tagged Lists, so no new core type is introduced."
@@ -680,7 +680,7 @@ decisions:
   - "Opt, Res, and Iter have both native and On1x-source implementations, checked against each other."
 
 # ---------------------------------------------------------------------------
-# Items this manifest assumes but could not confirm against SPECS.md 0.1.0
+# Items this manifest assumes but could not confirm against SPECS.md 1.0.0
 # ---------------------------------------------------------------------------
 spec_gaps:
   - question: "Int width and overflow behaviour (wrapping versus raising)."

@@ -14,7 +14,7 @@
     },
     "version": {
       "type": "string",
-      "default": "0.1.0",
+      "default": "1.0.0",
       "description": "Semantic version string emitted by generated CLIs."
     },
     "about": {

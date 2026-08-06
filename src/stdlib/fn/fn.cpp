@@ -78,7 +78,7 @@ On1x_Status fn_arity(On1x_State* s, int argc) noexcept {
     auto* func = static_cast<FunctionObject*>(v.as_object());
     if (!func) return bad(s, "Fn.Arity");
     if (func->native) {
-        // Native functions don't expose arity in 0.1.0
+        // Native functions don't expose arity in 1.0.0
         return stack_push(s, Value::integer(&s->gc, -1)) ? ON1X_OK : ON1X_ERR;
     }
     if (!func->chunk) return bad(s, "Fn.Arity: invalid function");

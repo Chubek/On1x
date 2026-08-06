@@ -46,7 +46,7 @@ struct CLICommandSpec {
 
 struct CLIManifestSpec {
   std::string program{};
-  std::string version{"0.1.0"};
+  std::string version{"1.0.0"};
   std::string about{};
   std::vector<CLICommandSpec> commands{};
   std::vector<CLIArgumentSpec> arguments{};

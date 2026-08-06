@@ -515,7 +515,7 @@ TEST_CASE("podlet packaging builds qpod when include_all_files is disabled") {
     REQUIRE(write_text_file(project / "Podlet.cpp", "int podlet() { return 1; }\n"));
     REQUIRE(write_text_file(project / "Podpack.qmr",
         "name = minimal_podlet\n"
-        "version = 0.1.0\n"
+        "version = 1.0.0\n"
         "entrypoint = Podlet.cpp\n"));
     REQUIRE(write_text_file(project / "Other.txt", "ignore-me\n"));
 
@@ -552,7 +552,7 @@ TEST_CASE("podlet packaging validates required files") {
     wrong_entry.output_qpod = (project / "bad2.qpod").string();
     REQUIRE(write_text_file(project / "Podpack.qmr",
         "name = broken\n"
-        "version = 0.1.0\n"
+        "version = 1.0.0\n"
         "entrypoint = Missing.cpp\n"));
     auto bad2 = qamrpp::podlet::build_qpod(wrong_entry);
     REQUIRE(!bad2.ok);
@@ -562,7 +562,7 @@ TEST_CASE("podlet packaging validates required files") {
 TEST_CASE("podlet runtime loads exports and metadata") {
     TempDir work;
     const std::filesystem::path archive = work.path / "runtime.qpod";
-    REQUIRE(write_binary_file(archive, make_qpod_bytes("runtime_podlet", "0.1.0", "Podlet.cpp", "return 5")));
+    REQUIRE(write_binary_file(archive, make_qpod_bytes("runtime_podlet", "1.0.0", "Podlet.cpp", "return 5")));
 
     qamrpp::Context ctx;
     REQUIRE(ctx.load_library_named(archive.string()));
@@ -577,7 +577,7 @@ TEST_CASE("podlet runtime loads exports and metadata") {
     REQUIRE(name->type == qamrpp::Value::STRING);
     REQUIRE(name->string_value == "runtime_podlet");
     REQUIRE(version->type == qamrpp::Value::STRING);
-    REQUIRE(version->string_value == "0.1.0");
+    REQUIRE(version->string_value == "1.0.0");
     REQUIRE(source->type == qamrpp::Value::STRING);
     REQUIRE(source->string_value == "return 5");
 }

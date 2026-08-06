@@ -383,7 +383,7 @@ On1x is embedded, not standalone-first. A "program" is a sequence of top-level s
 - **Loading.** A host may evaluate multiple source chunks against the same state; later chunks see earlier bindings.
 - **No implicit I/O.** The core language has no file, network, or clock access. Such capabilities exist only if the host registers them. This keeps embedded instances sandboxed by default.
 
-There is no separate module keyword in 0.1.0. Namespacing is done with Tables of functions:
+There is no separate module keyword in 1.0.0. Namespacing is done with Tables of functions:
 ```on1x
 let math = %{
     :square => fn(x) { x * x },

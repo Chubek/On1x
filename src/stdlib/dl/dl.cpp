@@ -144,7 +144,7 @@ On1x_Status dl_symbol(On1x_State* s, int argc) noexcept {
 }
 
 // Bind(handle, name, signature) -> :Some[:Fn] | :None
-// Full FFI binding — stub for 0.1.0.
+// Full FFI binding — stub for 1.0.0.
 On1x_Status dl_bind(On1x_State* s, int argc) noexcept {
     if (!require_arity(s, argc, 3, "Dl.Bind")) return ON1X_ERR;
     return stack_push(s, make_none(&s->gc, s->reserved)) ? ON1X_OK : ON1X_ERR;

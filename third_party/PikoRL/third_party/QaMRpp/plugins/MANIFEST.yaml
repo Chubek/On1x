@@ -2,7 +2,7 @@
 # This file describes what lives in the plugins directory and how consumers
 # are expected to use it.
 name: qa-mrpp-plugins
-version: 0.1.0
+version: 1.0.0
 description: >
   Optional built-in extensions that wire into the QaMRpp runtime and CLI workflows.
   The package includes compiler backends, serialization hooks, and utility helpers.

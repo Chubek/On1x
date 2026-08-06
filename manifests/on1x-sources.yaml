@@ -2,7 +2,7 @@ manifest: on1x-sources
 manifest_version: 1
 project:
   name: on1x
-  spec_version: 0.1.0
+  spec_version: 1.0.0
   language: C++20
   public_abi: C11
   artifacts:

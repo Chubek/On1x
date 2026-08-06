@@ -575,7 +575,7 @@ int main() {
 #else
     CHECK(on1x_ffi_available() == 0);
 #endif
-    CHECK(std::strcmp(on1x_version_string(), "0.1.0") == 0);
+    CHECK(std::strcmp(on1x_version_string(), "1.0.0") == 0);
     on1x_close(state);
     return failures == 0 ? 0 : 1;
 }

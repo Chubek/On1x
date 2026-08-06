@@ -85,7 +85,7 @@ int run_init(const std::filesystem::path& dir) {
         "// Future stages can compile/link this into richer runtime exports.\n";
     const std::string manifest_text =
         "name = " + name + "\n"
-        "version = 0.1.0\n"
+        "version = 1.0.0\n"
         "entrypoint = Podlet.cpp\n"
         "podlet_api = 1\n"
         "format_version = 1\n";

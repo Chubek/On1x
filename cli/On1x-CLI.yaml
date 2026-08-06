@@ -1,5 +1,5 @@
 program: on1x
-version: "0.1.0"
+version: "1.0.0"
 about: The On1x programming language — interpreter, REPL, and toolchain.
 arguments:
   - id: help
