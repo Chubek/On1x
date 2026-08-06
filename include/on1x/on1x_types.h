@@ -12,6 +12,7 @@ extern "C" {
 typedef struct On1x_State On1x_State;
 typedef struct On1x_FfiLibrary On1x_FfiLibrary;
 typedef uintptr_t On1x_Ref;
+typedef unsigned int On1x_Capability;
 
 typedef enum On1x_Type {
     ON1X_UNIT, ON1X_BOOL, ON1X_INT, ON1X_FLOAT, ON1X_STRING, ON1X_TAG,

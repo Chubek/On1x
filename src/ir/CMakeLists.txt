@@ -5,6 +5,9 @@ add_library(on1x_ir STATIC
   lower_effect.cpp
   lower_match.cpp
   cfg.cpp
+  passes/dce.cpp
+  passes/copy_prop.cpp
+  passes/inline.cpp
   verifier.cpp
 )
 

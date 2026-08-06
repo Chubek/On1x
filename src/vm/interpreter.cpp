@@ -10,6 +10,9 @@
 #include <on1x/on1x_call.h>
 #include "runtime/state.hpp"
 #include "runtime/effect.hpp"
+#include "runtime/call.hpp"
+#include "runtime/closure.hpp"
+#include "runtime/iterate.hpp"
 #include "runtime/pattern_match.hpp"
 #include "runtime/raise.hpp"
 
@@ -193,16 +196,11 @@ VmResult execute_function(
                 error = "invalid closure target";
                 return false;
             }
-            auto* function = gc_alloc<FunctionObject>(&state->gc);
-            GcRoot function_root(function);
-            function->chunk = target;
-            function->capture_count = target->capture_count();
-            if (function->capture_count != 0) {
-                function->captures = gc_alloc_array<Value>(&state->gc, function->capture_count);
-                for (std::size_t index = 0; index < function->capture_count; ++index) {
-                    function->captures[index] = stack[top - function->capture_count + index];
-                }
-            }
+            auto* function = runtime::new_closure(
+                &state->gc,
+                target,
+                stack + top - target->capture_count(),
+                target->capture_count());
             top -= function->capture_count;
             stack[top++] = value_from_object(function);
             break;
@@ -219,32 +217,13 @@ VmResult execute_function(
             auto* function = static_cast<FunctionObject*>(function_value.as_object());
             Value call_result;
             if (function->native) {
-                const std::size_t state_top = state->top;
-                if (!stack_push(state, function_value)) {
-                    error = "unable to prepare native call";
-                    return false;
-                }
-                for (std::size_t index = 0; index < argc; ++index) {
-                    if (!stack_push(state, stack[function_index + index + 1U])) {
-                        state->top = state_top;
-                        error = "unable to prepare native call";
-                        return false;
-                    }
-                }
-                const On1x_Status status = on1x_call(
-                    state,
-                    static_cast<int>(state_top + 1U),
-                    static_cast<int>(argc));
-                if (state->top == state_top) {
-                    error = "native call did not return a result";
-                    return false;
-                }
-                call_result = state->stack[state->top - 1U];
-                state->top = state_top;
-                if (status != ON1X_OK) {
-                    error = "native call failed";
-                    return false;
-                }
+                if (!runtime::invoke_native(
+                        state,
+                        function,
+                        stack + function_index + 1U,
+                        argc,
+                        call_result,
+                        error)) return false;
             } else if (!function->chunk ||
                        !execute_function(
                            state,
@@ -453,23 +432,9 @@ VmResult execute_function(
         }
         case Opcode::IterInit: {
             if (top == 0) { error = "VM stack underflow"; return false; }
-            Value iterable = stack[top - 1U];
-            if (iterable.kind() == Value::Kind::Table) {
-                const auto* table = as_table_const(iterable);
-                auto* keys = new_list(&state->gc, table->length);
-                GcRoot keys_root(keys);
-                for (const TableEntry* entry = table->entries; entry; entry = entry->next) {
-                    if (!list_push(&state->gc, keys, entry->key)) {
-                        error = "unable to enumerate Table";
-                        return false;
-                    }
-                }
-                iterable = value_from_object(keys);
-            }
-            if (iterable.kind() != Value::Kind::List) {
-                error = "for expects a List, Table, or range";
-                return false;
-            }
+            Value iterable;
+            if (!runtime::initialize_iteration(
+                    &state->gc, stack[top - 1U], iterable, error)) return false;
             stack[top - 1U] = iterable;
             if (top == 64) { error = "VM stack overflow"; return false; }
             stack[top++] = Value::integer(&state->gc, 0);

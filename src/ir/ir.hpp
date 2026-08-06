@@ -125,5 +125,8 @@ struct Module {
 };
 
 [[nodiscard]] std::string print(const Module& module);
+void eliminate_dead_code(Function& function);
+void propagate_copies(Function& function);
+void inline_small_functions(Module& module);
 
 }  // namespace on1x::ir

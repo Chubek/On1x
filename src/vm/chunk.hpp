@@ -5,6 +5,7 @@
 #include "vm/opcode.hpp"
 
 #include <cstddef>
+#include <string>
 
 namespace on1x {
 struct GcState;
@@ -71,5 +72,7 @@ private:
     Chunk** functions_ = nullptr;
     std::size_t function_count_ = 0;
 };
+
+[[nodiscard]] std::string disassemble(const Chunk& chunk);
 
 }  // namespace on1x::vm

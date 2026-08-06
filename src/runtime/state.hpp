@@ -45,6 +45,7 @@ struct On1x_State {
     bool api_frame_active = false;
     on1x::GcHandleTable handles;
     on1x::ApiReference* references = nullptr;
+    std::uint32_t capabilities = 0;
 
     On1x_State() : handles(&gc) {}
 };

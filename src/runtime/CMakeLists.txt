@@ -1,8 +1,12 @@
 add_library(on1x_runtime STATIC
   state.cpp
   stack.cpp
+  env.cpp
+  closure.cpp
+  call.cpp
   effect.cpp
   raise.cpp
+  iterate.cpp
   pattern_match.cpp
   operators.cpp
   field_access.cpp

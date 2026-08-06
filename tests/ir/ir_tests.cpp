@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <string>
 
+#include "ir/cfg.hpp"
+
 namespace {
 
 int failures = 0;
@@ -205,6 +207,27 @@ void test_effect_lowering() {
     CHECK(dump.find("end_effect_scope") != std::string::npos);
 }
 
+void test_cfg_edges() {
+    on1x::ir::Function function;
+    function.blocks = {{0, {}}, {1, {}}, {2, {}}};
+    on1x::ir::Instruction branch;
+    branch.opcode = on1x::ir::Opcode::BranchIfFalse;
+    branch.target = 2;
+    function.blocks[0].instructions.push_back(branch);
+    on1x::ir::Instruction jump;
+    jump.opcode = on1x::ir::Opcode::Jump;
+    jump.target = 0;
+    function.blocks[1].instructions.push_back(jump);
+    on1x::ir::Instruction ret;
+    ret.opcode = on1x::ir::Opcode::Return;
+    function.blocks[2].instructions.push_back(ret);
+    const auto graph = on1x::ir::build_cfg(function);
+    CHECK(graph.successors.size() == 3);
+    CHECK(graph.successors[0].size() == 2);
+    CHECK(graph.successors[1].size() == 1 && graph.successors[1][0] == 0);
+    CHECK(graph.predecessors[2].size() == 1 && graph.predecessors[2][0] == 0);
+}
+
 }
 
 int main() {
@@ -218,5 +241,6 @@ int main() {
     test_logical_lowering();
     test_aggregate_assignment_lowering();
     test_effect_lowering();
+    test_cfg_edges();
     return failures == 0 ? 0 : 1;
 }

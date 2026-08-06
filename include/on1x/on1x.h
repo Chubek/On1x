@@ -11,4 +11,7 @@
 #include "on1x_error.h"
 #include "on1x_gc.h"
 #include "on1x_ffi.h"
+#include "on1x_capability.h"
+#include "on1x_module.h"
+#include "on1x_stdlib.h"
 #include "on1x_version.h"

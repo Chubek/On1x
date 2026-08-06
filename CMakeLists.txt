@@ -4,6 +4,11 @@ project(on1x VERSION 0.1.0 LANGUAGES C CXX)
 
 option(ON1X_BUILD_TESTS "Build the On1x test suite" ON)
 option(ON1X_ENABLE_FFI "Enable the dyncall-based host FFI subsystem" OFF)
+option(ON1X_ENABLE_JIT "Enable the AsmJIT backend" OFF)
+option(ON1X_ENABLE_ASMTK "Enable the AsmTk assembly frontend" OFF)
+option(ON1X_ENABLE_SEXP "Enable the sfsexp subsystem" OFF)
+option(ON1X_STDLIB_PURE_ONLY "Build only capability-free stdlib modules" OFF)
+option(ON1X_STDLIB_DOCS "Embed stdlib documentation" ON)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -12,6 +17,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/on1x/on1x_config.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/generated/on1x/on1x_config.h
+  @ONLY
+)
 
 add_subdirectory(third_party/utf8proc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/libgc EXCLUDE_FROM_ALL)
@@ -27,6 +38,7 @@ if(ON1X_ENABLE_FFI)
   add_subdirectory(third_party/dyncall EXCLUDE_FROM_ALL)
   add_subdirectory(third_party/dynalo EXCLUDE_FROM_ALL)
 endif()
+add_subdirectory(include)
 add_subdirectory(src)
 
 if(ON1X_BUILD_TESTS)
