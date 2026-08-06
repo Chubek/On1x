@@ -1,0 +1,72 @@
+fn field_or(table, key, fallback) {
+    match Get(table, key) {
+        :Some[value] => value
+        _ => fallback
+    }
+}
+
+fn run(config) {
+    let input_dir = field_or(config, :InputDir, ".")
+    let output_path = field_or(config, :OutputPath, "./incident-digest.md")
+    let write_file = field_or(config, :WriteFile, true)
+    let files = 0
+    let files_with_errors = 0
+    let files_with_warnings = 0
+    let files_with_info = 0
+    let highlights = []
+
+    for name in Fs.ListDir(input_dir) {
+        let full_path = Path.Join(input_dir, name)
+        let is_log = Str.EndsWith(name, ".log") or Str.EndsWith(name, ".txt")
+        let should_scan = Fs.IsFile(full_path) and is_log
+        let text = ""
+
+        if should_scan { files = files + 1 }
+        if should_scan { text = Fs.ReadFile(full_path) }
+
+        let has_error = should_scan and Str.Contains(text, "ERROR")
+        let has_warning = should_scan and Str.Contains(text, "WARN")
+        let has_info = should_scan and Str.Contains(text, "INFO")
+
+        if has_error {
+            files_with_errors = files_with_errors + 1
+            Push(highlights, name + ": contains ERROR")
+        }
+        if has_warning {
+            files_with_warnings = files_with_warnings + 1
+            Push(highlights, name + ": contains WARN")
+        }
+        if has_info { files_with_info = files_with_info + 1 }
+    }
+
+    let report = (
+        "# Incident Digest\n\n" +
+        "Input directory: " + input_dir + "\n\n" +
+        "## File-Level Triage\n" +
+        "- Log files scanned: " + Str.FromInt(files) + "\n" +
+        "- Files containing ERROR: " + Str.FromInt(files_with_errors) + "\n" +
+        "- Files containing WARN: " + Str.FromInt(files_with_warnings) + "\n" +
+        "- Files containing INFO: " + Str.FromInt(files_with_info) + "\n"
+    )
+
+    if write_file {
+        Fs.MakeDirAll(Path.Dirname(output_path))
+        Fs.WriteFile(output_path, report)
+    }
+
+    %{
+        :Name => "IncidentDigest",
+        :ReportPath => output_path,
+        :Report => report,
+        :Files => files,
+        :FilesWithErrors => files_with_errors,
+        :FilesWithWarnings => files_with_warnings,
+        :FilesWithInfo => files_with_info,
+        :Highlights => highlights
+    }
+}
+
+%{
+    :Name => "IncidentDigest",
+    :Run => run
+}

@@ -1,0 +1,17 @@
+add_executable(on1x_example_embed_incident_digest
+  embed_incident_digest.c
+)
+target_link_libraries(on1x_example_embed_incident_digest PRIVATE on1x)
+target_link_libraries(on1x_example_embed_incident_digest PRIVATE on1x_shared)
+target_compile_definitions(on1x_example_embed_incident_digest PRIVATE
+  ON1X_EXAMPLE_SCRIPTS_DIR="${PROJECT_SOURCE_DIR}/examples/scripts"
+)
+
+add_executable(on1x_example_embed_rollout_policy
+  embed_rollout_policy.c
+)
+target_link_libraries(on1x_example_embed_rollout_policy PRIVATE on1x)
+target_link_libraries(on1x_example_embed_rollout_policy PRIVATE on1x_shared)
+target_compile_definitions(on1x_example_embed_rollout_policy PRIVATE
+  ON1X_EXAMPLE_SCRIPTS_DIR="${PROJECT_SOURCE_DIR}/examples/scripts"
+)

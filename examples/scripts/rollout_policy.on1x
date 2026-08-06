@@ -1,0 +1,83 @@
+fn field_or(table, key, fallback) {
+    match Get(table, key) {
+        :Some[value] => value
+        _ => fallback
+    }
+}
+
+fn clamp_score(score) {
+    if score < 0 { return 0 }
+    if score > 100 { return 100 }
+    score
+}
+
+fn error_budget(service) {
+    match Host.Metric("error_budget_remaining", service) {
+        :Some[value] => value
+        _ => 100
+    }
+}
+
+fn score_service(context) {
+    let service = field_or(context, :Service, "unknown")
+    let latency = field_or(context, :P95LatencyMs, 0)
+    let error_rate = field_or(context, :ErrorRatePct, 0)
+    let cpu = field_or(context, :CpuSaturationPct, 0)
+    let has_incident = field_or(context, :HasActiveIncident, false)
+    let score = 100
+
+    if latency > 400 { score = score - 45 }
+    if latency <= 400 and latency > 250 { score = score - 25 }
+
+    if error_rate > 2 { score = score - 35 }
+    if error_rate <= 2 and error_rate > 1 { score = score - 15 }
+
+    if cpu > 85 { score = score - 15 }
+    if has_incident { score = score - 100 }
+
+    let budget = error_budget(service)
+    if budget < 25 { score = score - 15 }
+    if budget > 70 { score = score + 5 }
+
+    clamp_score(score)
+}
+
+fn build_payload(context, action, reason, score, percent) {
+    %{
+        :Service => field_or(context, :Service, "unknown"),
+        :Action => action,
+        :Reason => reason,
+        :Score => score,
+        :Percent => percent
+    }
+}
+
+fn decide(context) {
+    let service = field_or(context, :Service, "unknown")
+    let score = score_service(context)
+    let has_incident = field_or(context, :HasActiveIncident, false)
+
+    if has_incident {
+        Host.RecordDecision(service, "Block", score)
+        return :Block[build_payload(context, "Block", "active incident in progress", score, 0)]
+    }
+
+    if score >= 85 {
+        Host.RecordDecision(service, "Promote", score)
+        return :Promote[build_payload(context, "Promote", "healthy service; expand rollout", score, 100)]
+    }
+
+    if score >= 60 {
+        Host.RecordDecision(service, "Canary", score)
+        return :Canary[build_payload(context, "Canary", "mixed signals; keep rollout small", score, 10)]
+    }
+
+    Host.RecordDecision(service, "Block", score)
+    :Block[build_payload(context, "Block", "risk score below rollout threshold", score, 0)]
+}
+
+%{
+    :Name => "RolloutPolicy",
+    :Score => score_service,
+    :Decide => decide
+}
