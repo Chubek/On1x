@@ -11,6 +11,7 @@
 #include "vm/chunk.hpp"
 
 #include "util/arena.hpp"
+#include <cstdio>
 
 extern "C" {
 On1x_State* on1x_open(void) {
@@ -61,18 +62,23 @@ void on1x_close(On1x_State* state) {
 On1x_Status on1x_eval(On1x_State* state, const char* source, size_t length, const char*) {
     if (!state || !source) return ON1X_ERR;
     try {
+        std::fprintf(stderr, "DIAG: on1x_eval entering: %.*s\n", (int)length, source);
         const std::string_view text(source, length);
         on1x::Arena arena;
         on1x::syntax::Diagnostics diagnostics;
         on1x::syntax::Parser parser(text, arena, diagnostics);
         auto* program = parser.parse_program();
+        std::fprintf(stderr, "DIAG: parse: program=%p diag_empty=%d\n", (void*)program, (int)diagnostics.empty());
         if (!program || !diagnostics.empty()) {
+            if (!diagnostics.empty()) std::fprintf(stderr, "DIAG: parse error: %s\n", diagnostics.entries().front().message.c_str());
             return on1x::push_api_error(
                 state,
                 diagnostics.empty() ? "invalid On1x chunk" : diagnostics.entries().front().message.c_str());
         }
         on1x::sema::Resolver resolver(diagnostics);
-        if (!resolver.resolve(program) || !diagnostics.empty()) {
+        bool resolve_ok = resolver.resolve(program);
+        std::fprintf(stderr, "DIAG: resolve: ok=%d diag_empty=%d\n", (int)resolve_ok, (int)diagnostics.empty());
+        if (!resolve_ok || !diagnostics.empty()) {
             return on1x::push_api_error(state, "invalid On1x semantics");
         }
         on1x::ir::Module module;
@@ -83,16 +89,21 @@ On1x_Status on1x_eval(On1x_State* state, const char* source, size_t length, cons
                 state,
                 diagnostics.empty() ? "unable to lower On1x chunk" : diagnostics.entries().front().message.c_str());
         }
+        std::fprintf(stderr, "DIAG: IR lowering/verify ok\n");
         on1x::vm::Chunk chunk(&state->gc);
         on1x::vm::Emitter emitter(state, chunk, diagnostics);
-        if (!emitter.emit_module(module) || !diagnostics.empty()) {
+        bool emit_ok = emitter.emit_module(module);
+        std::fprintf(stderr, "DIAG: emit: ok=%d diag_empty=%d\n", (int)emit_ok, (int)diagnostics.empty());
+        if (!emit_ok || !diagnostics.empty()) {
             return on1x::push_api_error(
                 state,
                 diagnostics.empty() ? "unable to compile On1x chunk" : diagnostics.entries().front().message.c_str());
         }
         on1x::Value result;
         const char* error = nullptr;
-        if (!on1x::vm::execute(state, chunk, result, error)) {
+        bool exec_ok = on1x::vm::execute(state, chunk, result, error);
+        std::fprintf(stderr, "DIAG: execute: ok=%d error=%s\n", (int)exec_ok, error ? error : "null");
+        if (!exec_ok) {
             return on1x::push_api_error(state, error ? error : "On1x execution failed");
         }
         return on1x::stack_push(state, result) ? ON1X_OK : ON1X_ERR;

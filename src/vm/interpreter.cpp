@@ -17,6 +17,7 @@
 #include "runtime/raise.hpp"
 
 #include <string_view>
+#include <cstdio>
 
 namespace on1x::runtime {
 bool apply_binary(
@@ -611,7 +612,13 @@ bool invoke_function(
     std::size_t argument_count,
     Value& result,
     const char*& error) noexcept {
-    if (!state || !function || (!function->native && !function->chunk)) {
+    if (!state || !function) {
+        error = "invalid function";
+        return false;
+    }
+    std::fprintf(stderr, "DIAG: invoke_function: native=%d chunk=%p argc=%zu\n",
+                 (int)(function->native != nullptr), (void*)function->chunk, argument_count);
+    if (!function->native && !function->chunk) {
         error = "invalid function";
         return false;
     }

@@ -7,13 +7,19 @@
 #include "stdlib/tag/tag.hpp"
 #include "stdlib/str/str.hpp"
 #include "stdlib/list/list.hpp"
+#include "stdlib/table/table.hpp"
+#include "stdlib/opt/opt.hpp"
+#include "stdlib/res/res.hpp"
 
 namespace on1x::stdlib {
 
 const ModuleEntry* modules(std::size_t& count) noexcept {
     static const ModuleEntry entries[] = {
         {cmp_module()}, {math_module()}, {bit_module()}, {tag_module()}, {str_module()},
-        {list_module()}};
+        {list_module()},
+        {table_module()},
+        {opt_module()},
+        {res_module()}};
     count = sizeof(entries) / sizeof(entries[0]);
     return entries;
 }

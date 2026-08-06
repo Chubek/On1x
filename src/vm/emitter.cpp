@@ -300,6 +300,9 @@ bool Emitter::emit_function(const ir::Function& function, Chunk& chunk) {
         chunk_->patch_operand(position, static_cast<std::uint32_t>(block_offsets[target]));
     }
     if (!pending_captures_.empty()) return false;
+    for (auto binding : function.parameter_bindings) {
+        local_count_ = std::max(local_count_, static_cast<std::size_t>(binding) + 1U);
+    }
     chunk_->set_local_count(local_count_);
     chunk_->set_signature(
         function.parameter_bindings.empty() ? nullptr : function.parameter_bindings.data(),

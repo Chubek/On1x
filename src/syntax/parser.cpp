@@ -322,24 +322,24 @@ AstNode* Parser::parse_tag(std::size_t begin) {
 AstNode* Parser::parse_block(std::size_t begin) {
     AstNode* block = builder_.make(AstKind::Block, begin);
     consume_terminators();
+    std::size_t const saved_nesting = nesting_depth_;
+    nesting_depth_ = 0;
     AstNode** tail = &block->first;
-    while (!failed_) {
+    AstNode* result = nullptr;
+    while (!failed_ && !result) {
         skip_trivia(false);
-        if (consume('}', false)) {
-            return block;
-        }
+        if (consume('}', false)) { result = block; break; }
         if (offset_ >= source_.size()) {
             error(begin, "expected '}' to close block");
-            return nullptr;
+            break;
         }
         AstNode* statement = parse_terminated_statement();
-        if (!statement) {
-            return nullptr;
-        }
+        if (!statement) break;
         *tail = statement;
         tail = &statement->sibling;
     }
-    return nullptr;
+    nesting_depth_ = saved_nesting;
+    return result;
 }
 
 AstNode* Parser::parse_if(std::size_t begin) {

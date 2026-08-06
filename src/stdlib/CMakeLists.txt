@@ -9,6 +9,11 @@ add_library(on1x_stdlib STATIC
   list/higher_order.cpp
   list/sort.cpp
   list/zip.cpp
+  table/table.cpp
+  table/query.cpp
+  table/higher_order.cpp
+  opt/opt.cpp
+  res/res.cpp
   capability.cpp
   module.cpp
   registry.cpp
