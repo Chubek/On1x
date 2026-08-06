@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 4.2)
 
-project(on1x VERSION 0.1.0 LANGUAGES C CXX)
+project(on1x VERSION 1.0.0 LANGUAGES C CXX)
 
 option(ON1X_BUILD_TESTS "Build the On1x test suite" ON)
 option(ON1X_ENABLE_FFI "Enable the dyncall-based host FFI subsystem" OFF)

@@ -1,21 +1,29 @@
 #include "On1x-CLI.hpp"
 
+#include "On1x-Autocomp.hpp"
+#include "On1x-Syntax.hpp"
 #include "tools/host_prelude.hpp"
-
-#include <PikoRL.hpp>
-#include "qamrpp_stubs.hpp"
 
 #include <on1x/on1x.h>
 #include <on1x/on1x_version.h>
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#if defined(_WIN32)
+#include <io.h>
+#define ON1X_ISATTY(fd) _isatty(fd)
+#else
+#include <unistd.h>
+#define ON1X_ISATTY(fd) isatty(fd)
+#endif
 
 namespace on1x_cli {
 
@@ -51,6 +59,35 @@ int bracket_balance(const std::string& line) {
     return bal;
 }
 
+// ANSI helpers. Colors are only emitted when stdout is a terminal.
+bool stdout_is_tty() {
+    return ON1X_ISATTY(1) != 0;
+}
+
+const char* ansi_reset() { return "\033[0m"; }
+const char* ansi_prompt() { return "\033[1;36m"; }
+
+std::string ansi_echo(const SyntaxHighlighter& highlighter,
+                      const std::string& source, bool tty) {
+    if (!tty || !highlighter.loaded()) return source;
+    return highlighter.highlight(source);
+}
+
+// Find the prefix of the last whitespace-separated word on the line.
+std::string current_word_prefix(const std::string& line) {
+    std::size_t start = line.size();
+    while (start > 0) {
+        char c = line[start - 1];
+        if (std::isspace(static_cast<unsigned char>(c)) || c == '{' ||
+            c == '}' || c == '(' || c == ')' || c == '[' || c == ']' ||
+            c == ',' || c == ';') {
+            break;
+        }
+        --start;
+    }
+    return line.substr(start);
+}
+
 } // anonymous namespace
 
 int run_repl(On1x_State* state) {
@@ -59,51 +96,65 @@ int run_repl(On1x_State* state) {
         return 1;
     }
 
-    // --- Initialize PikoRL REPL for prompt infrastructure ---
-    picorl::REPL pikorl_repl;
+    const bool tty = stdout_is_tty();
 
-    // Bind On1x eval into the PikoRL context so Lua extensions can call it.
-    pikorl_repl.bind_api("on1x_eval",
-        [state](qamrpp::Context&, std::vector<qamrpp::ValuePtr>& args) -> qamrpp::ValuePtr {
-            auto result = std::make_shared<qamrpp::Value>();
-            if (args.empty()) {
-                result->type = qamrpp::Value::Type::STRING;
-                result->string_value = "on1x_eval requires an expression";
-                return result;
-            }
-            const std::string& expr = args[0]->string_value;
-            On1x_Status st = on1x_eval(state, expr.c_str(), expr.size(), "<repl>");
-            result->type = qamrpp::Value::Type::STRING;
-            if (st == ON1X_OK) {
-                if (on1x_top(state) > 0) {
-                    result->string_value = on1x::tools::render_value(state, -1);
-                    on1x_pop(state, 1);
-                } else {
-                    result->string_value = ":Unit";
-                }
-            } else {
-                if (on1x_top(state) > 0) {
-                    result->string_value = "error: " + on1x::tools::render_value(state, -1);
-                    on1x_pop(state, 1);
-                } else {
-                    result->string_value = "error: evaluation failed";
-                }
-            }
-            return result;
-        });
+    // --- Load On1x syntax and autocompletion definitions ---
+    SyntaxHighlighter highlighter;
+    Autocompleter autocompleter;
 
-    // Try to load autocomplete/syntax bundles.
-    (void)pikorl_repl.load_example_bundle("cli");
+    // Resolve the cli directory: try the same candidates as on1x.cpp.
+    std::string cli_dir;
+    {
+        const std::string candidates[] = {
+            "cli/",
+            "../cli/",
+            "../../cli/",
+        };
+        std::string syntax_path;
+        for (const auto& prefix : candidates) {
+            std::ifstream test(prefix + "On1x.syntax");
+            if (test.good()) {
+                cli_dir = prefix;
+                break;
+            }
+        }
+    }
+    if (!cli_dir.empty()) {
+        if (!highlighter.load(cli_dir + "On1x.syntax")) {
+            std::cerr << "on1x: warning: could not load " << cli_dir
+                      << "On1x.syntax\n";
+        }
+        if (!autocompleter.load(cli_dir + "On1x.autocomp")) {
+            std::cerr << "on1x: warning: could not load " << cli_dir
+                      << "On1x.autocomp\n";
+        }
+    } else {
+        std::cerr << "on1x: warning: could not find cli/On1x.syntax or "
+                     "cli/On1x.autocomp — syntax highlighting and completion "
+                     "disabled\n";
+    }
 
     // --- Banner ---
     std::cout << "On1x " << ON1X_VERSION_MAJOR << "." << ON1X_VERSION_MINOR
               << "." << ON1X_VERSION_PATCH << " REPL\n";
-    std::cout << "Type ':quit' or press Ctrl-D to exit.  ':help' for more.\n\n";
+    std::cout << "Type ':quit' or press Ctrl-D to exit.  ':help' for more.\n";
+    if (autocompleter.loaded()) {
+        std::cout << "Completion: ':complete <prefix>' lists matching "
+                     "keywords.\n";
+    }
+    std::cout << "\n";
 
-    // --- Main REPL loop using On1x eval ---
+    // --- Main REPL loop ---
     const char* prompt_str = "on1x> ";
     const char* cont_prompt_str = "....  ";
     std::string accumulated;
+
+    auto show_help = []() {
+        std::cout << "  :quit, :q, :exit   Exit the REPL\n";
+        std::cout << "  :help, :h          Show this help\n";
+        std::cout << "  :complete <prefix> Show keyword completions\n";
+        std::cout << "  Anything else is evaluated as On1x.\n";
+    };
 
     while (true) {
         std::cout << (accumulated.empty() ? prompt_str : cont_prompt_str) << std::flush;
@@ -123,9 +174,23 @@ int run_repl(On1x_State* state) {
 
             if (trimmed == ":quit" || trimmed == ":q" || trimmed == ":exit") break;
             if (trimmed == ":help" || trimmed == ":h") {
-                std::cout << "  :quit, :q     Exit the REPL\n";
-                std::cout << "  :help, :h     Show this help\n";
-                std::cout << "  Anything else is evaluated as On1x.\n";
+                show_help();
+                continue;
+            }
+            if (trimmed.rfind(":complete", 0) == 0) {
+                std::string prefix = trimmed.substr(9);
+                // Trim leading whitespace
+                std::size_t ws = 0;
+                while (ws < prefix.size() && std::isspace(static_cast<unsigned char>(prefix[ws]))) ++ws;
+                prefix = prefix.substr(ws);
+                auto matches = autocompleter.complete(prefix);
+                if (matches.empty()) {
+                    std::cout << "  (no matches)\n";
+                } else {
+                    for (const auto& m : matches) {
+                        std::cout << "  " << m << "\n";
+                    }
+                }
                 continue;
             }
         }
@@ -141,6 +206,14 @@ int run_repl(On1x_State* state) {
         if (needs_continuation(line) || bracket_balance(accumulated) > 0)
             continue;
         if (accumulated.empty()) continue;
+
+        // Echo the statement with syntax highlighting (tty only), then
+        // evaluate.
+        if (tty && highlighter.loaded() && !accumulated.empty()) {
+            std::cout << "\033[2K\r" << prompt_str
+                      << ansi_echo(highlighter, accumulated, tty)
+                      << ansi_reset() << "\n";
+        }
 
         // Evaluate with On1x
         On1x_Status status = on1x_eval(
