@@ -5,9 +5,14 @@ usage() {
   cat <<'EOF'
 Usage: bindings/GenerateBindings.sh <language> [+xfeat ...] [--library NAME] [--output DIR]
 
-Generates SWIG bindings from bindings/On1x.i. The default library name is
-"on1x"; enabled XFeats must be listed in bindings/XFeats.yaml and support the
-selected language.
+Generates SWIG 4.0+ bindings from bindings/On1x.i. The default library name
+is "on1x"; enabled XFeats must be listed in bindings/XFeats.yaml and support
+the selected language.
+
+Examples:
+  bindings/GenerateBindings.sh Python
+  bindings/GenerateBindings.sh Python +py-builtin +exception-mapping
+  bindings/GenerateBindings.sh Java +exception-mapping --library on1x_jni
 EOF
 }
 
@@ -24,7 +29,7 @@ while [[ $# -gt 0 ]]; do
     --library) shift; [[ $# -gt 0 ]] || { usage >&2; exit 2; }; library=$1 ;;
     --output) shift; [[ $# -gt 0 ]] || { usage >&2; exit 2; }; output=$1 ;;
     --help|-h) usage; exit 0 ;;
-    *) printf 'Unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+    *) printf 'Unknown argument: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
   shift
 done
@@ -40,7 +45,7 @@ case $language in
   Perl) swig_language=perl5 ;;
   R) swig_language=r ;;
   D) swig_language=d ;;
-  JavaScript) swig_language=javascript ;;
+  JavaScript|Node) swig_language=javascript ;;
   *) printf 'Unsupported SWIG language: %s\n' "$language" >&2; exit 2 ;;
 esac
 
@@ -48,6 +53,16 @@ root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 manifest="$root/bindings/XFeats.yaml"
 interface="$root/bindings/On1x.i"
 command -v swig >/dev/null || { echo "swig is required" >&2; exit 127; }
+
+# Require SWIG 4.0+ for -builtin and modern %feature support.
+swig_version=$(swig -version 2>/dev/null | grep -oP '\d+\.\d+' | head -1 || true)
+if [[ -n $swig_version ]]; then
+  major=${swig_version%%.*}
+  if [[ $major -lt 4 ]]; then
+    printf 'SWIG >= 4.0 required (found %s)\n' "$swig_version" >&2
+    exit 127
+  fi
+fi
 
 for feature in "${features[@]}"; do
   if ! awk -v wanted="$feature" -v language="$language" '
@@ -75,9 +90,16 @@ done
 extra=()
 for feature in "${features[@]}"; do
   [[ $feature == py-builtin && $language == Python ]] && extra+=("-builtin")
-  [[ $feature == directors ]] && extra+=("-directors")
 done
 
-swig "-$swig_language" -I"$root/include" -outdir "$output" -o "$output/${library}_wrap.cxx" \
-  -module "$library" "${defines[@]}" "${extra[@]}" "$interface"
+swig "-$swig_language" \
+  -I"$root/include" \
+  -outdir "$output" \
+  -o "$output/${library}_wrap.cxx" \
+  -module "$library" \
+  -Wextra \
+  "${defines[@]}" \
+  "${extra[@]}" \
+  "$interface"
+
 printf 'Generated %s bindings in %s\n' "$language" "$output"

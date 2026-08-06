@@ -42,13 +42,14 @@ chosen because it composes with the rest:
 
 - **Chapters 2–3:** Getting started, the value model.
 - **Chapters 4–11:** Every scalar and compound type.
-- **Chapters 12–16:** Optionals, results, effects, bindings, expressions.
-- **Chapters 17–28:** Operators, control flow, pattern matching, functions,
-  scoping, `Iota`, enums, modules, lexical structure.
-- **Chapters 29–32:** Embedding On1x in C — the complete `libon1x` API.
-- **Chapters 33–35:** The standard library: pure modules, capability-gated
+- **Chapters 12–16:** Optionals, results, effects, bindings, functions.
+- **Chapters 17–21:** Expressions, operators, control flow, pattern matching,
+  `Iota`, and enumerations.
+- **Chapters 22–23:** Lexical structure and modules.
+- **Chapters 24–25:** Embedding On1x in C and the C++ facade.
+- **Chapters 26–28:** The standard library: pure modules, capability-gated
   modules, and optional tiers.
-- **Chapter 36:** Formal grammar reference.
+- **Chapters 29–30:** Errors, debugging, and formal grammar reference.
 
 Each chapter assumes you have read the preceding ones. Code examples are
 complete and runnable.
