@@ -1,0 +1,10 @@
+// Conformance test: List module
+
+let r1 = List.New(3, 0)
+let r2 = List.First([1, 2, 3])
+let r3 = List.Last([1, 2, 3])
+let r4 = List.Concat([1, 2], [3, 4])
+let r5 = List.Reverse([1, 2, 3])
+let r6 = List.Take([1, 2, 3, 4], 2)
+
+:Success[?"list conformance: ok"]

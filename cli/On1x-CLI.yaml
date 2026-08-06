@@ -1,0 +1,61 @@
+program: on1x
+version: "0.1.0"
+about: The On1x programming language — interpreter, REPL, and toolchain.
+arguments:
+  - id: help
+    kind: flag
+    names:
+      - "-h"
+      - "--help"
+    help: Show help and exit.
+  - id: version
+    kind: flag
+    names:
+      - "-V"
+      - "--version"
+    help: Show version and exit.
+  - id: expr
+    kind: option
+    names:
+      - "-e"
+      - "--expr"
+    help: Evaluate a single On1x expression.
+  - id: file
+    kind: option
+    names:
+      - "-f"
+      - "--file"
+    help: Run an On1x source file.
+  - id: repl
+    kind: flag
+    names:
+      - "-r"
+      - "--repl"
+    help: Start the interactive REPL.
+  - id: pure
+    kind: flag
+    names:
+      - "--pure"
+    help: Start with pure-only stdlib (no capability modules).
+  - id: no-prelude
+    kind: flag
+    names:
+      - "--no-prelude"
+    help: Do not install the standard prelude.
+commands:
+  - name: run
+    help: Run an On1x source file.
+    arguments:
+      - id: file
+        kind: positional
+        help: Path to the On1x source file.
+  - name: eval
+    help: Evaluate a single On1x expression.
+    arguments:
+      - id: expr
+        kind: positional
+        help: On1x expression to evaluate.
+  - name: repl
+    help: Start the interactive REPL.
+  - name: version
+    help: Print version information.

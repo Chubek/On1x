@@ -1,0 +1,97 @@
+// List_ext module — derived list helpers (GroupBy, Tally, Scan).
+// These are higher-level operations expressed in terms of the core List API.
+
+// GroupBy(l: List, keyFn: Fn) -> :Table
+// Group elements by a key function. Returns a Table mapping keys to
+// lists of elements that share that key.
+fn GroupBy(l, keyFn) {
+    let result = Table.New()
+    let idx = 0
+    while idx < Len(l) {
+        match Get(l, idx) {
+            :Some[?elem] => {
+                let key = keyFn(elem)
+                // Try to get existing group, or start a new one.
+                match Get(result, key) {
+                    :Some[?group] => { Push(group, elem); () }
+                    :None         => { Set(result, key, [elem]) }
+                }
+            }
+            :None => ()
+        }
+        idx = idx + 1
+    }
+    result
+}
+
+// Tally(l: List) -> :Table
+// Count occurrences of each element (using structural equality).
+fn Tally(l) {
+    let result = Table.New()
+    let idx = 0
+    while idx < Len(l) {
+        match Get(l, idx) {
+            :Some[?elem] => {
+                match Get(result, elem) {
+                    :Some[?count] => { Set(result, elem, count + 1) }
+                    :None         => { Set(result, elem, 1) }
+                }
+            }
+            :None => ()
+        }
+        idx = idx + 1
+    }
+    result
+}
+
+// Scan(l: List, f: Fn, init) -> :List
+// Prefix scan (like fold but yielding all intermediate values).
+fn Scan(l, f, init) {
+    let result = [init]
+    let acc = init
+    let idx = 0
+    while idx < Len(l) {
+        match Get(l, idx) {
+            :Some[?elem] => {
+                acc = f(acc, elem)
+                Push(result, acc)
+            }
+            :None => ()
+        }
+        idx = idx + 1
+    }
+    result
+}
+
+// Transpose(ll: List of Lists) -> :List
+// Rows become columns. Assumes all inner lists have the same length.
+fn Transpose(ll) {
+    match Get(ll, 0) {
+        :Some[?first] => {
+            let n = Len(first)
+            let m = Len(ll)
+            let result = []
+            let i = 0
+            while i < n {
+                let row = []
+                let j = 0
+                while j < m {
+                    match Get(ll, j) {
+                        :Some[?inner] => {
+                            match Get(inner, i) {
+                                :Some[?v] => { Push(row, v); () }
+                                :None => ()
+                            }
+                        }
+                        :None => ()
+                    }
+                    j = j + 1
+                }
+                Push(result, row)
+                i = i + 1
+            }
+            result
+        }
+        :None => []
+    }
+}

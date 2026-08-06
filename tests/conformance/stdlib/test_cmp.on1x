@@ -1,0 +1,25 @@
+// Conformance test: Cmp module
+
+// Cmp.Eq
+let r1 = Cmp.Eq(1, 1)
+let r2 = Cmp.Eq(1, 2)
+let r3 = Cmp.Eq(1.5, 1.5)
+let r4 = Cmp.Eq("hello", "hello")
+
+// Cmp.DeepEq
+let r5 = Cmp.DeepEq([1, 2, 3], [1, 2, 3])
+
+// Cmp.Compare returns :Some[ordering] or :None
+let r6 = Cmp.Compare(1, 2)
+let r7 = Cmp.Compare(2, 2)
+let r8 = Cmp.Compare(2, 1)
+
+// Cmp.MinOf / MaxOf take a list
+let r9  = Cmp.MinOf([3, 7])
+let r10 = Cmp.MaxOf([3, 7])
+
+// Cmp.Hash returns :Some[hash] or :None
+let r11 = Cmp.Hash(42)
+
+// All succeeded
+:Success[?"cmp conformance: ok"]

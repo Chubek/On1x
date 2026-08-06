@@ -1,0 +1,9 @@
+// Conformance test: Table module
+
+let t = %{1 => "one", 2 => "two"}
+let r1 = Table.HasKey(t, 1)
+let r2 = Table.GetOr(t, 1, "default")
+let r3 = Table.Entries(t)
+let r4 = Table.Remove(t, 1)
+
+:Success[?"table conformance: ok"]

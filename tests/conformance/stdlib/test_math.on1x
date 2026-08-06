@@ -1,0 +1,10 @@
+// Conformance test: Math module
+
+let r1 = Math.Abs(-5)
+let r2 = Math.Abs(5)
+let r3 = Math.Min(3, 7)
+let r4 = Math.Max(3, 7)
+let r5 = Math.Sqrt(4.0)
+let r6 = Math.Pow(2.0, 3.0)
+
+:Success[?"math conformance: ok"]

@@ -22,6 +22,12 @@ bool invoke_native(
     try {
         GcRoot function_root(function);
         const std::size_t state_top = state->top;
+        
+        // Save previous captures state
+        Value* prev_captures = state->invocation_captures;
+        const std::size_t prev_capture_count = state->invocation_capture_count;
+        
+        // Push function and arguments for on1x_call
         if (!stack_push(state, value_from_object(function))) {
             error = "unable to prepare native call";
             return false;
@@ -33,10 +39,20 @@ bool invoke_native(
                 return false;
             }
         }
+        
+        // Set invocation captures before calling native
+        state->invocation_captures = function->captures;
+        state->invocation_capture_count = function->capture_count;
+        
         const On1x_Status status = on1x_call(
             state,
             static_cast<int>(state_top + 1U),
             static_cast<int>(argument_count));
+        
+        // Restore captures
+        state->invocation_captures = prev_captures;
+        state->invocation_capture_count = prev_capture_count;
+        
         if (state->top == state_top) {
             error = "native call did not return a result";
             return false;

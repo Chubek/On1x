@@ -1,0 +1,44 @@
+-- On1x syntax highlighting definitions for PikoRL.
+-- Provides token patterns and colours for the On1x REPL.
+return {
+  name = "on1x",
+  theme = {
+    comment    = "bright-black",
+    string     = "green",
+    number     = "magenta",
+    boolean    = "magenta",
+    operator   = "white",
+    keyword    = "blue",
+    tag        = "cyan",
+    identifier = "default",
+    bracket    = "bright-black",
+    type       = "yellow",
+    error      = "red",
+  },
+  patterns = {
+    -- Line comments.
+    comment    = "//[^\n]*",
+    -- Strings: double-quoted with escapes, and single-quoted with escapes.
+    string     = "\"([^\"\\]|\\.)*\"|'([^'\\]|\\.)*'",
+    -- Unicode escapes and character literals.
+    char_lit   = "\\\\u\\{[0-9a-fA-F]+\\}",
+    -- Numbers: hex, binary, octal, decimal integers, and floats with underscores.
+    number     = "%f[%d]0[xX][0-9a-fA-F_]+%f[^%w_]|%f[%d]0[bB][01_]+%f[^%w_]|%f[%d]0[oO][0-7_]+%f[^%w_]|%f[%d]%d[%d_]*%.?%d*%f[^%w_]",
+    -- Tags starting with colon.
+    tag        = ":[%w_][%w_]*",
+    -- Operators.
+    operator   = "[+%-%*/%%=<>!&|%^~@#$\\.,;:]+",
+    -- Keywords.
+    keyword    = "%f[%a]if%f[^%w_]|%f[%a]else%f[^%w_]|%f[%a]while%f[^%w_]|%f[%a]for%f[^%w_]|%f[%a]in%f[^%w_]|%f[%a]match%f[^%w_]|%f[%a]with%f[^%w_]|%f[%a]return%f[^%w_]|%f[%a]break%f[^%w_]|%f[%a]continue%f[^%w_]|%f[%a]let%f[^%w_]|%f[%a]fn%f[^%w_]|%f[%a]enum%f[^%w_]|%f[%a]try%f[^%w_]|%f[%a]raise%f[^%w_]",
+    -- Boolean literals.
+    boolean    = "%f[%a]true%f[^%w_]|%f[%a]false%f[^%w_]",
+    -- Brackets.
+    bracket    = "[%[%]{}()]",
+  },
+  -- Simple highlighting function that returns the line as a single
+  -- "text" token. The full pattern matching is handled by PikoRL's
+  -- AutoSyntax extension which uses the patterns table.
+  highlight = function(line)
+    return { { token = "text", value = line or "" } }
+  end
+}

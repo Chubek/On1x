@@ -1,0 +1,53 @@
+-- On1x autocomplete definitions for PikoRL.
+-- Provides keyword completion for the On1x REPL.
+return {
+  name = "on1x",
+  keywords = {
+    -- Control flow
+    "if", "else", "while", "for", "in", "match", "with",
+    "return", "break", "continue",
+    -- Declarations
+    "let", "fn", "enum",
+    -- Effect handling
+    "try", "raise",
+    -- Boolean literals
+    "true", "false",
+    -- Prelude/Stdlib modules
+    "Cmp", "Math", "Bit", "Tag", "Str", "List", "Table",
+    "Opt", "Res", "Fn", "Iter", "Rand",
+    "Io", "Fs", "Path", "Os", "Time",
+    "Sexp", "Dl", "Asm",
+    -- Prelude functions
+    "TypeOf", "TagOf", "PayloadOf", "Length",
+    "Get", "Set", "Push", "Pop", "Keys", "Values",
+    "Iota", "IsSome", "IsNone", "Unwrap", "UnwrapOr",
+    "IsSuccess", "IsError",
+    -- REPL meta-commands
+    ":quit", ":q", ":exit", ":help", ":h", ":reset",
+  },
+  suggest = function(prefix)
+    local results = {}
+    local kw = {
+      "if", "else", "while", "for", "in", "match", "with",
+      "return", "break", "continue",
+      "let", "fn", "enum",
+      "try", "raise",
+      "true", "false",
+      "Cmp", "Math", "Bit", "Tag", "Str", "List", "Table",
+      "Opt", "Res", "Fn", "Iter", "Rand",
+      "Io", "Fs", "Path", "Os", "Time",
+      "Sexp", "Dl", "Asm",
+      "TypeOf", "TagOf", "PayloadOf", "Length",
+      "Get", "Set", "Push", "Pop", "Keys", "Values",
+      "Iota", "IsSome", "IsNone", "Unwrap", "UnwrapOr",
+      "IsSuccess", "IsError",
+      ":quit", ":q", ":exit", ":help", ":h", ":reset",
+    }
+    for _, keyword in ipairs(kw) do
+      if keyword:sub(1, #prefix) == prefix then
+        table.insert(results, keyword)
+      end
+    end
+    return results
+  end
+}

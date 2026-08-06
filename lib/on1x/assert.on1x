@@ -1,0 +1,65 @@
+// Assert — lightweight assertions for testing and debugging.
+// Used by tests/conformance scripts. Not installed by on1x_open_std.
+
+// Assert(cond: :Bool) -> :Unit
+// If cond is false, raise an :Error.
+fn Assert(cond) {
+    match cond {
+        true  => ()
+        false => :Error[?"assertion failed"]
+    }
+}
+
+// AssertEq(a, b) -> :Unit
+// Assert that a and b are structurally equal.
+fn AssertEq(a, b) {
+    match a == b {
+        true  => ()
+        false => :Error[?"assertion failed: equality expected"]
+    }
+}
+
+// AssertNe(a, b) -> :Unit
+// Assert that a and b are not structurally equal.
+fn AssertNe(a, b) {
+    match a != b {
+        true  => ()
+        false => :Error[?"assertion failed: inequality expected"]
+    }
+}
+
+// AssertSome(o: ?a) -> a
+// Assert that o is :Some and return the payload.
+fn AssertSome(o) {
+    match o {
+        :Some[?v] => v
+        :None     => :Error[?"expected :Some, got :None"]
+    }
+}
+
+// AssertNone(o: ?a) -> :Unit
+// Assert that o is :None.
+fn AssertNone(o) {
+    match o {
+        :Some[?v] => :Error[?"expected :None, got :Some"]
+        :None     => ()
+    }
+}
+
+// AssertSuccess(r: Result) -> value
+// Assert r is :Success and return the payload.
+fn AssertSuccess(r) {
+    match r {
+        :Success[?v] => v
+        :Error[?e]   => :Error[?"expected :Success, got :Error"]
+    }
+}
+
+// AssertError(r: Result) -> value
+// Assert r is :Error and return the payload.
+fn AssertError(r) {
+    match r {
+        :Success[?v] => :Error[?"expected :Error, got :Success"]
+        :Error[?e]   => e
+    }
+}

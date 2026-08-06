@@ -48,6 +48,10 @@ struct On1x_State {
     on1x::GcRootVector persistent_roots;
     on1x::ApiReference* references = nullptr;
     std::uint32_t capabilities = 0;
+    // Combinator capture support: set by invoke_native before calling a native
+    // function that is the result of Compose/Partial/Flip/Memo/Const.
+    on1x::Value* invocation_captures = nullptr;
+    std::size_t invocation_capture_count = 0;
 
     On1x_State() : handles(&gc) {}
 };

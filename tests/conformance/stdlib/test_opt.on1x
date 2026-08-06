@@ -1,0 +1,8 @@
+// Conformance test: Opt module
+
+let r1 = Opt.Map(:Some[42], fn(x) { x * 2 })
+let r2 = Opt.OrElse(:None, fn() { :Some[99] })
+let r3 = Opt.ToList(:Some[42])
+let r4 = Opt.Filter(:Some[42], fn(x) { x > 10 })
+
+:Success[?"opt conformance: ok"]

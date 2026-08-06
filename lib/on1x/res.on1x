@@ -1,0 +1,85 @@
+// Res module — reference implementation of result combinators.
+// Results are values captured by '~' as :Success[?v] or :Error[?e].
+// These mirror src/stdlib/res/res.cpp.
+
+// Map(r: Result, f: Fn) -> Result
+// Map over the success arm.
+fn Map(r, f) {
+    match r {
+        :Success[?v] => :Success[?f(v)]
+        :Error[?e]   => :Error[?e]
+    }
+}
+
+// MapError(r: Result, f: Fn) -> Result
+// Map over the error arm.
+fn MapError(r, f) {
+    match r {
+        :Success[?v] => :Success[?v]
+        :Error[?e]   => :Error[?f(e)]
+    }
+}
+
+// AndThen(r: Result, f: Fn) -> Result
+// Chain a function that returns a Result on success.
+fn AndThen(r, f) {
+    match r {
+        :Success[?v] => f(v)
+        :Error[?e]   => :Error[?e]
+    }
+}
+
+// OrElse(r: Result, f: Fn) -> Result
+// Return r on success; call fallback on error.
+fn OrElse(r, f) {
+    match r {
+        :Success[?v] => :Success[?v]
+        :Error[?e]   => f(e)
+    }
+}
+
+// Payload(r: Result) -> ?v
+// Extract the payload from either arm.
+fn Payload(r) {
+    match r {
+        :Success[?v] => :Some[?v]
+        :Error[?e]   => :Some[?e]
+    }
+}
+
+// ToOpt(r: Result) -> ?v
+// Convert :Success to :Some and :Error to :None.
+fn ToOpt(r) {
+    match r {
+        :Success[?v] => :Some[?v]
+        :Error[?e]   => :None
+    }
+}
+
+// UnwrapOr(r: Result, default) -> value
+// Extract the success payload or return the default.
+fn UnwrapOr(r, d) {
+    match r {
+        :Success[?v] => v
+        :Error[?e]   => d
+    }
+}
+
+// Collect(l: List of Results) -> Result
+// If all elements are :Success, return :Success of their payloads.
+// Otherwise return the first :Error encountered.
+fn Collect(l) {
+    let acc = []
+    for i in Iota(Len(l)) {
+        match Get(l, i) {
+            :Some[?item] => (
+                match item {
+                    :Success[?v] => { Push(acc, v); () }
+                    :Error[?e]   => { return :Error[?e] }
+                }
+            )
+            :None => { return :Error[?"expected a value"] }
+        }
+    }
+    :Success[?acc]
+}

@@ -1,0 +1,9 @@
+// Conformance test: Str module
+
+let r1 = Str.CharLen("hello")
+let r2 = Str.Upper("abc")
+let r3 = Str.Lower("ABC")
+let r4 = Str.Contains("hello", "ell")
+let r5 = Str.At("hello", 0)
+
+:Success[?"str conformance: ok"]

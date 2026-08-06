@@ -1,0 +1,56 @@
+// Prelude_ext — small conveniences layered on top of the prelude.
+// These are pure helpers that need no native code.
+
+// Identity(x) -> x
+fn Identity(x) { x }
+
+// Const(x) -> Fn
+// Returns a function that ignores its argument and always returns x.
+fn Const(x) {
+    fn inner(_) { x }
+    inner
+}
+
+// Compose(f, g) -> Fn
+// Returns f ∘ g: apply g first, then f.
+fn Compose(f, g) {
+    fn inner(x) { f(g(x)) }
+    inner
+}
+
+// Pipe(fns: List of Fn) -> Fn
+// Compose a list of functions left-to-right.
+fn Pipe(fns) {
+    fn inner(x) {
+        let acc = x
+        let i = 0
+        while i < Len(fns) {
+            match Get(fns, i) {
+                :Some[?f] => { acc = f(acc); () }
+                :None     => ()
+            }
+            i = i + 1
+        }
+        acc
+    }
+    inner
+}
+
+// Repeat(f: Fn, n: :Int) -> List
+// Call f n times with indices 0..n-1, collecting results.
+fn Repeat(f, n) {
+    let result = []
+    let i = 0
+    while i < n {
+        Push(result, f(i))
+        i = i + 1
+    }
+    result
+}
+
+// Range(lo: :Int, hi: :Int) -> List
+// Generate [lo, lo+1, ..., hi-1]. Delegates to Iota.
+fn Range(lo, hi) { Iota(lo, hi) }
+
+// RangeStep(lo: :Int, hi: :Int, step: :Int) -> List
+fn RangeStep(lo, hi, step) { Iota(lo, hi, step) }

@@ -1,0 +1,85 @@
+// Opt module — reference implementation of optional-value combinators.
+// These mirror the native src/stdlib/opt/opt.cpp. Parity tests verify
+// that both implementations agree.
+
+// Map(o: ?a, f: Fn) -> ?b
+// Apply f to the payload if Some, otherwise pass through None.
+fn Map(o, f) {
+    match o {
+        :Some[?v] => :Some[?f(v)]
+        :None     => :None
+    }
+}
+
+// AndThen(o: ?a, f: Fn) -> ?b
+// Apply f to the payload; f must itself return an optional.
+fn AndThen(o, f) {
+    match o {
+        :Some[?v] => f(v)
+        :None     => :None
+    }
+}
+
+// OrElse(o: ?a, f: Fn) -> ?a
+// Return o if Some; otherwise apply the fallback f.
+fn OrElse(o, f) {
+    match o {
+        :Some[?v] => :Some[?v]
+        :None     => f()
+    }
+}
+
+// Filter(o: ?a, pred: Fn) -> ?a
+// Keep the value only if pred(v) is true.
+fn Filter(o, pred) {
+    match o {
+        :Some[?v] => (
+            match pred(v) {
+                true  => :Some[?v]
+                false => :None
+            }
+        )
+        :None => :None
+    }
+}
+
+// ToList(o: ?a) -> List
+// Convert an optional to a list: [] for :None, [v] for :Some.
+fn ToList(o) {
+    match o {
+        :Some[?v] => [v]
+        :None     => []
+    }
+}
+
+// FromList(l: List) -> ?a
+// Take the first element from a list, or :None if empty.
+fn FromList(l) {
+    match Get(l, 0) {
+        :Some[?v] => :Some[?v]
+        :None     => :None
+    }
+}
+
+// Zip(a: ?x, b: ?y) -> ?[x, y]
+// Combine two optionals; :None if either is :None.
+fn Zip(a, b) {
+    match a {
+        :Some[?av] => (
+            match b {
+                :Some[?bv] => :Some[?[av, bv]]
+                :None      => :None
+            }
+        )
+        :None => :None
+    }
+}
+
+// Flatten(o: ??a) -> ?a
+// Collapse a nested optional.
+fn Flatten(o) {
+    match o {
+        :Some[?inner] => inner
+        :None         => :None
+    }
+}
