@@ -42,6 +42,7 @@
 build/
 Build/
 build-*/
+build_*/
 
 # CMake generated files
 CMakeFiles/
@@ -78,3 +79,14 @@ AGENTS.md
 *.rewrite.yaml
 *.generate.yaml
 _ON1X_
+
+# Python
+__pycache__
+*.pyc
+
+# .env noise
+.env*
+
+# Agent noise
+.claude
+.gapcode
