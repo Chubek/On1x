@@ -21,6 +21,9 @@ public:
 private:
     [[nodiscard]] bool emit_instruction(const ir::Instruction& instruction);
     [[nodiscard]] bool emit_constant(Value value);
+    [[nodiscard]] bool compile_pattern(
+        const ir::Pattern& source,
+        runtime::Pattern*& result);
     [[nodiscard]] bool emit_jump(Opcode opcode, ir::BlockId target);
     [[nodiscard]] bool emit_function(const ir::Function& function, Chunk& chunk);
 
@@ -28,6 +31,7 @@ private:
     Chunk* chunk_;
     syntax::Diagnostics& diagnostics_;
     std::vector<std::pair<std::size_t, ir::BlockId>> pending_jumps_;
+    std::vector<std::size_t> pending_captures_;
     std::size_t local_count_ = 0;
 };
 

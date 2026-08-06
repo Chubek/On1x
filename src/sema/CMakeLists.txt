@@ -1,6 +1,9 @@
 add_library(on1x_sema STATIC
   resolver.cpp
   effect_scope.cpp
+  enum_check.cpp
+  pattern_check.cpp
+  assign_check.cpp
 )
 
 target_include_directories(on1x_sema PUBLIC ${PROJECT_SOURCE_DIR}/src)

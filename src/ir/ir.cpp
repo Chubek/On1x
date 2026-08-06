@@ -6,7 +6,7 @@ namespace on1x::ir {
 
 bool Instruction::has_side_effects() const noexcept {
     return opcode == Opcode::StoreGlobal || opcode == Opcode::Call ||
-        opcode == Opcode::Capture || opcode == Opcode::Return;
+        opcode == Opcode::BeginCapture || opcode == Opcode::Return;
 }
 
 namespace {
@@ -29,10 +29,14 @@ std::string_view opcode_name(Opcode opcode) noexcept {
     case Opcode::Call: return "call";
     case Opcode::Index: return "index";
     case Opcode::Field: return "field";
+    case Opcode::SetIndex: return "set_index";
+    case Opcode::SetField: return "set_field";
     case Opcode::Some: return "some";
     case Opcode::None: return "none";
     case Opcode::EffectResult: return "effect_result";
-    case Opcode::Capture: return "capture";
+    case Opcode::BeginCapture: return "begin_capture";
+    case Opcode::EndCapture: return "end_capture";
+    case Opcode::EndEffectScope: return "end_effect_scope";
     case Opcode::Discard: return "discard";
     case Opcode::LoadLocal: return "load_local";
     case Opcode::StoreLocal: return "store_local";
@@ -41,6 +45,12 @@ std::string_view opcode_name(Opcode opcode) noexcept {
     case Opcode::Phi: return "phi";
     case Opcode::LoadUpvalue: return "load_upvalue";
     case Opcode::MakeFunction: return "make_function";
+    case Opcode::IterInit: return "iter_init";
+    case Opcode::IterNext: return "iter_next";
+    case Opcode::IterClose: return "iter_close";
+    case Opcode::RequireBool: return "require_bool";
+    case Opcode::MatchPattern: return "match_pattern";
+    case Opcode::MatchFailure: return "match_failure";
     case Opcode::Return: return "return";
     }
     return "unknown";

@@ -2,6 +2,8 @@ add_library(on1x_ir STATIC
   ir.cpp
   builder.cpp
   lower_ast.cpp
+  lower_effect.cpp
+  lower_match.cpp
   cfg.cpp
   verifier.cpp
 )

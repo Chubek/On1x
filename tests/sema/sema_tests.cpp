@@ -73,6 +73,19 @@ void test_effect_scope() {
         CHECK(!resolver.resolve(program));
         CHECK(!diagnostics.empty());
     }
+    {
+        on1x::Arena arena;
+        on1x::syntax::Diagnostics diagnostics;
+        auto* program = parse("~ 1\n~ 2\n~", arena, diagnostics);
+        CHECK(program != nullptr && diagnostics.empty());
+        on1x::sema::Resolver resolver(diagnostics);
+        CHECK(resolver.resolve(program));
+        CHECK(diagnostics.empty());
+        auto* inner_effect = program->first->first->next;
+        auto* inner_result = inner_effect->first->next;
+        CHECK(inner_result->kind == on1x::syntax::AstKind::EffectResult);
+        CHECK(inner_result->lexical_depth == 0);
+    }
 }
 
 void test_block_shadowing() {
@@ -122,6 +135,82 @@ void test_function_resolution_and_return() {
     }
 }
 
+void test_loop_resolution() {
+    {
+        on1x::Arena arena;
+        on1x::syntax::Diagnostics diagnostics;
+        auto* program = parse("for item in [1] { item }", arena, diagnostics);
+        CHECK(program != nullptr && diagnostics.empty());
+        on1x::sema::Resolver resolver(diagnostics);
+        CHECK(resolver.resolve(program));
+        CHECK(diagnostics.empty());
+        auto* body_identifier = program->first->first->next->first;
+        CHECK(body_identifier->resolution == on1x::syntax::ResolutionKind::Local);
+    }
+    {
+        on1x::Arena arena;
+        on1x::syntax::Diagnostics diagnostics;
+        auto* program = parse("break\ncontinue", arena, diagnostics);
+        CHECK(program != nullptr && diagnostics.empty());
+        on1x::sema::Resolver resolver(diagnostics);
+        CHECK(!resolver.resolve(program));
+        CHECK(!diagnostics.empty());
+        CHECK(diagnostics.entries().front().message == "break is only valid inside a loop");
+    }
+}
+
+void test_enum_resolution() {
+    {
+        on1x::Arena arena;
+        on1x::syntax::Diagnostics diagnostics;
+        auto* program = parse("enum { Red = Iota, Green = Iota + 1 }", arena, diagnostics);
+        CHECK(program != nullptr && diagnostics.empty());
+        on1x::sema::Resolver resolver(diagnostics);
+        CHECK(resolver.resolve(program));
+        CHECK(diagnostics.empty());
+        CHECK(program->first->first->first->kind == on1x::syntax::AstKind::EnumIota);
+        CHECK(program->first->first->next->first->first->kind == on1x::syntax::AstKind::EnumIota);
+    }
+    {
+        on1x::Arena arena;
+        on1x::syntax::Diagnostics diagnostics;
+        auto* program = parse("enum { Red = 0, Red = 1 }", arena, diagnostics);
+        CHECK(program != nullptr && diagnostics.empty());
+        on1x::sema::Resolver resolver(diagnostics);
+        CHECK(!resolver.resolve(program));
+        CHECK(!diagnostics.empty());
+        CHECK(diagnostics.entries().front().message == "duplicate enum member 'Red'");
+    }
+}
+
+void test_match_resolution() {
+    {
+        on1x::Arena arena;
+        on1x::syntax::Diagnostics diagnostics;
+        auto* program = parse("match :Pair[1, 2] { :Pair[left, right] => left + right }", arena, diagnostics);
+        CHECK(program != nullptr && diagnostics.empty());
+        on1x::sema::Resolver resolver(diagnostics);
+        CHECK(resolver.resolve(program));
+        CHECK(diagnostics.empty());
+        auto* arm = program->first->first->next;
+        auto* left = arm->first->first;
+        auto* body_left = arm->first->next->first;
+        CHECK(left->resolution == on1x::syntax::ResolutionKind::Local);
+        CHECK(body_left->resolution == on1x::syntax::ResolutionKind::Local);
+        CHECK(left->binding_index == body_left->binding_index);
+    }
+    {
+        on1x::Arena arena;
+        on1x::syntax::Diagnostics diagnostics;
+        auto* program = parse("match [1, 2] { [value, value] => value }", arena, diagnostics);
+        CHECK(program != nullptr && diagnostics.empty());
+        on1x::sema::Resolver resolver(diagnostics);
+        CHECK(!resolver.resolve(program));
+        CHECK(!diagnostics.empty());
+        CHECK(diagnostics.entries().front().message == "pattern binds 'value' more than once");
+    }
+}
+
 }
 
 int main() {
@@ -130,5 +219,8 @@ int main() {
     test_effect_scope();
     test_block_shadowing();
     test_function_resolution_and_return();
+    test_loop_resolution();
+    test_enum_resolution();
+    test_match_resolution();
     return failures == 0 ? 0 : 1;
 }

@@ -34,6 +34,19 @@ std::string_view kind_name(AstKind kind) noexcept {
     case AstKind::Function: return "Function";
     case AstKind::Parameter: return "Parameter";
     case AstKind::Return: return "Return";
+    case AstKind::While: return "While";
+    case AstKind::For: return "For";
+    case AstKind::Break: return "Break";
+    case AstKind::Continue: return "Continue";
+    case AstKind::Enum: return "Enum";
+    case AstKind::EnumMember: return "EnumMember";
+    case AstKind::EnumIota: return "EnumIota";
+    case AstKind::Match: return "Match";
+    case AstKind::MatchArm: return "MatchArm";
+    case AstKind::PatternWildcard: return "PatternWildcard";
+    case AstKind::PatternBinding: return "PatternBinding";
+    case AstKind::PatternList: return "PatternList";
+    case AstKind::PatternTaggedList: return "PatternTaggedList";
     case AstKind::Program: return "Program";
     }
     return "Unknown";

@@ -11,7 +11,8 @@ bool visit(syntax::AstNode* node, syntax::Diagnostics& diagnostics, std::uint32_
             diagnostics.add(node->position, "'~' is only available in an effect follower statement");
             return false;
         }
-        node->lexical_depth = effect_depth - 1U;
+        // spec §9: nested capture followers always read the innermost result.
+        node->lexical_depth = 0;
         return true;
     }
     if (node->kind == syntax::AstKind::Effect) {

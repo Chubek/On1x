@@ -1,10 +1,16 @@
 #include "sema/resolver.hpp"
 
 #include "sema/effect_scope.hpp"
+#include "sema/enum_check.hpp"
+#include "sema/pattern_check.hpp"
 
 #include <algorithm>
 
 namespace on1x::sema {
+
+bool check_assignment_target(
+    const syntax::AstNode* target,
+    syntax::Diagnostics& diagnostics);
 
 const Resolver::Binding* Resolver::find_binding(std::string_view name) const noexcept {
     for (auto iterator = bindings_.rbegin(); iterator != bindings_.rend(); ++iterator) {
@@ -95,6 +101,25 @@ bool Resolver::resolve_expression(syntax::AstNode* node) {
             (!else_branch || resolve_expression(else_branch));
     }
     if (node->kind == syntax::AstKind::Function) return resolve_function(node);
+    if (node->kind == syntax::AstKind::Enum) {
+        if (!check_enum(node, diagnostics_)) return false;
+        bool valid = true;
+        for (syntax::AstNode* member = node->first; member; member = member->next) {
+            valid = resolve_expression(member->first) && valid;
+        }
+        return valid;
+    }
+    if (node->kind == syntax::AstKind::While) {
+        syntax::AstNode* condition = node->first;
+        syntax::AstNode* body = condition ? condition->next : nullptr;
+        if (!resolve_expression(condition)) return false;
+        ++loop_depth_;
+        const bool valid = resolve_block(body);
+        --loop_depth_;
+        return valid;
+    }
+    if (node->kind == syntax::AstKind::For) return resolve_for(node);
+    if (node->kind == syntax::AstKind::Match) return resolve_match(node);
     bool valid = true;
     for (syntax::AstNode* child = node->first; child; child = child->next) {
         valid = resolve_expression(child) && valid;
@@ -102,13 +127,71 @@ bool Resolver::resolve_expression(syntax::AstNode* node) {
     return valid;
 }
 
+void Resolver::introduce_pattern_bindings(syntax::AstNode* pattern) {
+    if (!pattern) return;
+    if (pattern->kind == syntax::AstKind::PatternBinding) {
+        pattern->resolution = syntax::ResolutionKind::Local;
+        pattern->binding_index = next_binding_;
+        pattern->lexical_depth = scope_depth_;
+        bindings_.push_back({pattern->text, next_binding_++, scope_depth_, current_function_});
+        return;
+    }
+    for (syntax::AstNode* child = pattern->first; child; child = child->next) {
+        introduce_pattern_bindings(child);
+    }
+}
+
+bool Resolver::resolve_match(syntax::AstNode* node) {
+    syntax::AstNode* subject = node->first;
+    if (!subject || !resolve_expression(subject)) return false;
+    node->binding_index = next_binding_++;
+    bool valid = true;
+    for (syntax::AstNode* arm = subject->next; arm; arm = arm->next) {
+        if (arm->kind != syntax::AstKind::MatchArm || !arm->first || !arm->first->next) {
+            diagnostics_.add(node->position, "invalid match arm");
+            valid = false;
+            continue;
+        }
+        syntax::AstNode* pattern = arm->first;
+        syntax::AstNode* body = pattern->next;
+        valid = check_pattern(pattern, diagnostics_) && valid;
+        const std::size_t bindings_before = bindings_.size();
+        ++scope_depth_;
+        introduce_pattern_bindings(pattern);
+        valid = resolve_expression(body) && valid;
+        --scope_depth_;
+        bindings_.resize(bindings_before);
+    }
+    return valid;
+}
+
+bool Resolver::resolve_for(syntax::AstNode* node) {
+    syntax::AstNode* iterable = node->first;
+    syntax::AstNode* body = iterable ? iterable->next : nullptr;
+    if (!resolve_expression(iterable) || !body || body->kind != syntax::AstKind::Block) return false;
+    const std::size_t bindings_before = bindings_.size();
+    ++scope_depth_;
+    node->resolution = syntax::ResolutionKind::Local;
+    node->binding_index = next_binding_;
+    node->lexical_depth = scope_depth_;
+    bindings_.push_back({node->text, next_binding_++, scope_depth_, current_function_});
+    ++loop_depth_;
+    const bool valid = resolve_block(body);
+    --loop_depth_;
+    --scope_depth_;
+    bindings_.resize(bindings_before);
+    return valid;
+}
+
 bool Resolver::resolve_function(syntax::AstNode* node) {
     const std::size_t bindings_before = bindings_.size();
     const std::uint32_t previous_function = current_function_;
     const std::uint32_t previous_scope = scope_depth_;
+    const std::uint32_t previous_loop_depth = loop_depth_;
     node->function_index = next_function_++;
     current_function_ = node->function_index;
     scope_depth_ = 1;
+    loop_depth_ = 0;
     function_stack_.push_back(node);
 
     syntax::AstNode* child = node->first;
@@ -124,6 +207,7 @@ bool Resolver::resolve_function(syntax::AstNode* node) {
     bindings_.resize(bindings_before);
     current_function_ = previous_function;
     scope_depth_ = previous_scope;
+    loop_depth_ = previous_loop_depth;
     return valid;
 }
 
@@ -168,9 +252,21 @@ bool Resolver::resolve_statement(syntax::AstNode* node) {
         }
         return resolve_expression(node->first);
     }
+    if (node->kind == syntax::AstKind::Break || node->kind == syntax::AstKind::Continue) {
+        if (loop_depth_ == 0) {
+            diagnostics_.add(
+                node->position,
+                node->kind == syntax::AstKind::Break
+                    ? "break is only valid inside a loop"
+                    : "continue is only valid inside a loop");
+            return false;
+        }
+        return true;
+    }
     if (node->kind == syntax::AstKind::Assign) {
         syntax::AstNode* target = node->first;
         syntax::AstNode* value = target ? target->next : nullptr;
+        if (!check_assignment_target(target, diagnostics_)) return false;
         if (target && target->kind == syntax::AstKind::Identifier) {
             annotate_reference(target, true);
         } else {

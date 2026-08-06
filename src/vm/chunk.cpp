@@ -20,10 +20,25 @@ void Chunk::grow_instructions() {
     instruction_capacity_ = capacity;
 }
 
+void Chunk::grow_patterns() {
+    const std::size_t capacity = pattern_capacity_ == 0 ? 8 : pattern_capacity_ * 2U;
+    auto** patterns = gc_alloc_array<runtime::Pattern*>(gc_, capacity);
+    for (std::size_t index = 0; index < pattern_count_; ++index) patterns[index] = patterns_[index];
+    patterns_ = patterns;
+    pattern_capacity_ = capacity;
+}
+
 bool Chunk::add_constant(Value value, std::uint32_t& index) {
     if (constant_count_ == constant_capacity_) grow_constants();
     constants_[constant_count_] = value;
     index = static_cast<std::uint32_t>(constant_count_++);
+    return true;
+}
+
+bool Chunk::add_pattern(runtime::Pattern* pattern, std::uint32_t& index) {
+    if (pattern_count_ == pattern_capacity_) grow_patterns();
+    patterns_[pattern_count_] = pattern;
+    index = static_cast<std::uint32_t>(pattern_count_++);
     return true;
 }
 

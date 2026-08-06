@@ -3,6 +3,7 @@
 #include "core/table.hpp"
 #include "ir/lower_ast.hpp"
 #include "ir/verifier.hpp"
+#include "prelude/prelude.hpp"
 #include "sema/resolver.hpp"
 #include "syntax/parser.hpp"
 #include "vm/emitter.hpp"
@@ -18,6 +19,11 @@ On1x_State* on1x_open(void) {
         on1x::gc_init(&state->gc);
         state->reserved = on1x::make_reserved_tags(&state->gc, state->tags);
         state->globals = on1x::new_table(&state->gc);
+        if (!on1x::prelude::install(state)) {
+            on1x::gc_shutdown(&state->gc);
+            delete state;
+            return nullptr;
+        }
         return state;
     } catch (...) {
         return nullptr;
@@ -52,12 +58,16 @@ On1x_Status on1x_eval(On1x_State* state, const char* source, size_t length, cons
         if (!on1x::ir::lower_ast(program, module, diagnostics) ||
             !on1x::ir::verify(module, diagnostics) ||
             !diagnostics.empty()) {
-            return on1x::push_api_error(state, "unable to lower On1x chunk");
+            return on1x::push_api_error(
+                state,
+                diagnostics.empty() ? "unable to lower On1x chunk" : diagnostics.entries().front().message.c_str());
         }
         on1x::vm::Chunk chunk(&state->gc);
         on1x::vm::Emitter emitter(state, chunk, diagnostics);
         if (!emitter.emit_module(module) || !diagnostics.empty()) {
-            return on1x::push_api_error(state, "unable to compile On1x chunk");
+            return on1x::push_api_error(
+                state,
+                diagnostics.empty() ? "unable to compile On1x chunk" : diagnostics.entries().front().message.c_str());
         }
         on1x::Value result;
         const char* error = nullptr;

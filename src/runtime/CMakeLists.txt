@@ -1,4 +1,12 @@
-add_library(on1x_runtime STATIC state.cpp stack.cpp)
+add_library(on1x_runtime STATIC
+  state.cpp
+  stack.cpp
+  effect.cpp
+  raise.cpp
+  pattern_match.cpp
+  operators.cpp
+  field_access.cpp
+)
 target_include_directories(on1x_runtime
   PUBLIC ${PROJECT_SOURCE_DIR}/src
   PRIVATE ${PROJECT_SOURCE_DIR}/include

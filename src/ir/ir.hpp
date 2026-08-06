@@ -1,10 +1,12 @@
 #pragma once
 
+#include "syntax/ast.hpp"
 #include "syntax/diagnostics.hpp"
 #include "util/small_vector.hpp"
 
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -14,6 +16,24 @@ namespace on1x::ir {
 using Register = std::uint32_t;
 using BlockId = std::uint32_t;
 inline constexpr Register no_register = UINT32_MAX;
+
+enum class PatternKind {
+    Literal,
+    Wildcard,
+    Binding,
+    List,
+    TaggedList,
+};
+
+struct Pattern {
+    PatternKind kind{};
+    syntax::AstKind literal_kind{};
+    std::string text;
+    std::vector<Pattern> children;
+    std::uint32_t binding = 0;
+    bool has_tail = false;
+    std::uint32_t tail_binding = 0;
+};
 
 enum class Opcode {
     Unit,
@@ -32,10 +52,14 @@ enum class Opcode {
     Call,
     Index,
     Field,
+    SetIndex,
+    SetField,
     Some,
     None,
     EffectResult,
-    Capture,
+    BeginCapture,
+    EndCapture,
+    EndEffectScope,
     Discard,
     LoadLocal,
     StoreLocal,
@@ -44,6 +68,12 @@ enum class Opcode {
     Phi,
     LoadUpvalue,
     MakeFunction,
+    IterInit,
+    IterNext,
+    IterClose,
+    RequireBool,
+    MatchPattern,
+    MatchFailure,
     Return,
 };
 
@@ -55,6 +85,9 @@ struct Instruction {
     syntax::SourcePosition position{};
     BlockId target = 0;
     std::uint32_t binding = 0;
+    std::int64_t integer_value = 0;
+    bool has_integer_value = false;
+    std::shared_ptr<Pattern> pattern;
 
     [[nodiscard]] bool has_result() const noexcept { return result != no_register; }
     [[nodiscard]] bool has_side_effects() const noexcept;

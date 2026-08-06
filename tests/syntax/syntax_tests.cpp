@@ -150,6 +150,17 @@ void test_comments_newlines_and_diagnostics() {
     {
         on1x::Arena arena;
         on1x::syntax::Diagnostics diagnostics;
+        on1x::syntax::Parser parser("~ 1 / 0\n~", arena, diagnostics);
+        const auto* program = parser.parse_program();
+        CHECK(program != nullptr && diagnostics.empty());
+        CHECK(program->first != nullptr &&
+              program->first->kind == on1x::syntax::AstKind::Effect);
+        CHECK(program->first->first != nullptr &&
+              program->first->first->kind == on1x::syntax::AstKind::Binary);
+    }
+    {
+        on1x::Arena arena;
+        on1x::syntax::Diagnostics diagnostics;
         on1x::syntax::Parser parser("let answer = 40 + 2\nanswer = answer + 1", arena, diagnostics);
         const auto* program = parser.parse_program();
         CHECK(program != nullptr && diagnostics.empty());
@@ -219,6 +230,74 @@ void test_function_syntax() {
     CHECK(program->first->sibling->first->first->next->variadic);
 }
 
+void test_loop_syntax() {
+    on1x::Arena arena;
+    on1x::syntax::Diagnostics diagnostics;
+    on1x::syntax::Parser parser(
+        "while true { break }\n"
+        "for item in [1, 2] { continue }",
+        arena,
+        diagnostics);
+    const auto* program = parser.parse_program();
+    CHECK(program != nullptr && diagnostics.empty());
+    CHECK(program->first != nullptr && program->first->kind == on1x::syntax::AstKind::While);
+    CHECK(program->first->first->next->first->kind == on1x::syntax::AstKind::Break);
+    CHECK(program->first->sibling != nullptr &&
+          program->first->sibling->kind == on1x::syntax::AstKind::For);
+    CHECK(program->first->sibling->first->next->first->kind == on1x::syntax::AstKind::Continue);
+}
+
+void test_enum_syntax() {
+    on1x::Arena arena;
+    on1x::syntax::Diagnostics diagnostics;
+    on1x::syntax::Parser parser(
+        "enum {\n"
+        "  Red = Iota,\n"
+        "  Green = 4\n"
+        "  Blue = Iota,\n"
+        "}",
+        arena,
+        diagnostics);
+    const auto* program = parser.parse_program();
+    CHECK(program != nullptr && diagnostics.empty());
+    CHECK(program->first != nullptr && program->first->kind == on1x::syntax::AstKind::Enum);
+    CHECK(program->first->first != nullptr &&
+          program->first->first->kind == on1x::syntax::AstKind::EnumMember);
+    CHECK(program->first->first->next != nullptr &&
+          program->first->first->next->next != nullptr);
+}
+
+void test_match_syntax() {
+    {
+        on1x::Arena arena;
+        on1x::syntax::Diagnostics diagnostics;
+        on1x::syntax::Parser parser(
+            "match :Point[1, 2] {\n"
+            "  :Point[x, y] => x\n"
+            "  [head, ..tail] => head\n"
+            "  _ => 0\n"
+            "}",
+            arena,
+            diagnostics);
+        const auto* program = parser.parse_program();
+        CHECK(program != nullptr && diagnostics.empty());
+        CHECK(program->first != nullptr && program->first->kind == on1x::syntax::AstKind::Match);
+        const auto* arm = program->first->first->next;
+        CHECK(arm != nullptr && arm->kind == on1x::syntax::AstKind::MatchArm);
+        CHECK(arm->first != nullptr && arm->first->kind == on1x::syntax::AstKind::PatternTaggedList);
+        CHECK(arm->next != nullptr && arm->next->first->kind == on1x::syntax::AstKind::PatternList);
+        CHECK(arm->next->first->first->next->variadic);
+    }
+    {
+        on1x::Arena arena;
+        on1x::syntax::Diagnostics diagnostics;
+        on1x::syntax::Parser parser("match [1] { [..tail, x] => x }", arena, diagnostics);
+        CHECK(parser.parse_program() == nullptr);
+        CHECK(!diagnostics.empty());
+        CHECK(diagnostics.entries().front().message == "tail binding must be last in List pattern");
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -231,5 +310,8 @@ int main() {
     test_comments_newlines_and_diagnostics();
     test_blocks_and_if_expressions();
     test_function_syntax();
+    test_loop_syntax();
+    test_enum_syntax();
+    test_match_syntax();
     return failures == 0 ? 0 : 1;
 }

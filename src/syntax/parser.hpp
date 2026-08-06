@@ -26,6 +26,13 @@ private:
     [[nodiscard]] AstNode* parse_if(std::size_t begin);
     [[nodiscard]] AstNode* parse_function(std::size_t begin);
     [[nodiscard]] AstNode* parse_return(std::size_t begin);
+    [[nodiscard]] AstNode* parse_while(std::size_t begin);
+    [[nodiscard]] AstNode* parse_for(std::size_t begin);
+    [[nodiscard]] AstNode* parse_enum(std::size_t begin);
+    [[nodiscard]] AstNode* parse_match(std::size_t begin);
+    [[nodiscard]] AstNode* parse_pattern();
+    [[nodiscard]] AstNode* parse_pattern_list(std::size_t begin);
+    [[nodiscard]] AstNode* parse_pattern_tag(std::size_t begin);
     [[nodiscard]] AstNode* parse_list(std::size_t begin);
     [[nodiscard]] AstNode* parse_table(std::size_t begin);
     [[nodiscard]] AstNode* parse_tag(std::size_t begin);

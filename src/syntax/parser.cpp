@@ -434,6 +434,268 @@ AstNode* Parser::parse_return(std::size_t begin) {
     return result;
 }
 
+AstNode* Parser::parse_while(std::size_t begin) {
+    AstNode* condition = parse_expression();
+    if (!condition) return nullptr;
+    if (!consume('{')) {
+        error(offset_, "expected '{' after while condition");
+        return nullptr;
+    }
+    AstNode* loop = builder_.make(AstKind::While, begin, "while");
+    loop->first = condition;
+    condition->next = parse_block(offset_ - 1U);
+    return condition->next ? loop : nullptr;
+}
+
+AstNode* Parser::parse_for(std::size_t begin) {
+    const std::string_view name = scan_identifier();
+    if (name.empty() || is_keyword(name)) {
+        error(offset_, "expected loop binding after 'for'");
+        return nullptr;
+    }
+    if (!consume("in")) {
+        error(offset_, "expected 'in' after loop binding");
+        return nullptr;
+    }
+    AstNode* iterable = parse_expression();
+    if (!iterable) return nullptr;
+    if (!consume('{')) {
+        error(offset_, "expected '{' after for iterable");
+        return nullptr;
+    }
+    AstNode* loop = builder_.make(AstKind::For, begin, name);
+    loop->first = iterable;
+    iterable->next = parse_block(offset_ - 1U);
+    return iterable->next ? loop : nullptr;
+}
+
+AstNode* Parser::parse_enum(std::size_t begin) {
+    if (!consume('{')) {
+        error(offset_, "expected '{' after 'enum'");
+        return nullptr;
+    }
+    AstNode* enumeration = builder_.make(AstKind::Enum, begin, "enum");
+    AstNode** tail = &enumeration->first;
+    consume_terminators();
+    while (!failed_) {
+        skip_trivia(false);
+        if (consume('}', false)) return enumeration;
+        const std::size_t member_offset = offset_;
+        const std::string_view name = scan_identifier();
+        if (name.empty() || is_keyword(name)) {
+            error(offset_, "expected enum member name");
+            return nullptr;
+        }
+        if (!consume('=')) {
+            error(offset_, "expected '=' after enum member name");
+            return nullptr;
+        }
+        AstNode* value = parse_expression();
+        if (!value) return nullptr;
+        AstNode* member = builder_.make(AstKind::EnumMember, member_offset, name);
+        member->first = value;
+        *tail = member;
+        tail = &member->next;
+
+        if (consume(',', false)) {
+            consume_terminators();
+            continue;
+        }
+        skip_trivia(false);
+        if (consume('}', false)) return enumeration;
+        if (at_statement_end()) {
+            consume_terminators();
+            continue;
+        }
+        error(offset_, "expected ',' or '}' after enum member");
+        return nullptr;
+    }
+    return nullptr;
+}
+
+AstNode* Parser::parse_pattern_list(std::size_t begin) {
+    AstNode* pattern = builder_.make(AstKind::PatternList, begin);
+    ++nesting_depth_;
+    if (consume(']', true)) {
+        --nesting_depth_;
+        return pattern;
+    }
+    while (!failed_) {
+        if (consume("..", true)) {
+            const std::string_view tail = scan_identifier();
+            if (tail.empty() || tail == "_" || is_keyword(tail)) {
+                error(offset_, "expected tail binding after '..' in List pattern");
+                --nesting_depth_;
+                return nullptr;
+            }
+            AstNode* binding = builder_.make(
+                AstKind::PatternBinding, offset_ - tail.size(), tail);
+            binding->variadic = true;
+            AstBuilder::append_child(pattern->first, binding);
+            if (!consume(']', true)) {
+                error(offset_, "tail binding must be last in List pattern");
+                --nesting_depth_;
+                return nullptr;
+            }
+            --nesting_depth_;
+            return pattern;
+        }
+        AstNode* element = parse_pattern();
+        if (!element) {
+            --nesting_depth_;
+            return nullptr;
+        }
+        AstBuilder::append_child(pattern->first, element);
+        if (consume(']', true)) {
+            --nesting_depth_;
+            return pattern;
+        }
+        if (!consume(',', true)) {
+            error(offset_, "expected ',' or ']' in List pattern");
+            --nesting_depth_;
+            return nullptr;
+        }
+    }
+    --nesting_depth_;
+    return nullptr;
+}
+
+AstNode* Parser::parse_pattern_tag(std::size_t begin) {
+    std::string_view name;
+    if (offset_ < source_.size() && source_[offset_] == '"') {
+        name = scan_string();
+        std::string decoded;
+        if (!failed_ && !decode_string(name, decoded)) {
+            error(begin, "invalid quoted Tag pattern");
+            return nullptr;
+        }
+    } else {
+        name = scan_identifier();
+        if (name.empty() || is_keyword(name)) {
+            error(begin, "expected Tag name after ':' in pattern");
+            return nullptr;
+        }
+    }
+    AstNode* pattern = builder_.make(AstKind::PatternTaggedList, begin, name);
+    if (!consume('[', nesting_depth_ != 0)) return pattern;
+    ++nesting_depth_;
+    if (consume(']', true)) {
+        --nesting_depth_;
+        return pattern;
+    }
+    while (!failed_) {
+        AstNode* element = parse_pattern();
+        if (!element) {
+            --nesting_depth_;
+            return nullptr;
+        }
+        AstBuilder::append_child(pattern->first, element);
+        if (consume(']', true)) {
+            --nesting_depth_;
+            return pattern;
+        }
+        if (!consume(',', true)) {
+            error(offset_, "expected ',' or ']' in Tagged List pattern");
+            --nesting_depth_;
+            return nullptr;
+        }
+    }
+    --nesting_depth_;
+    return nullptr;
+}
+
+AstNode* Parser::parse_pattern() {
+    skip_trivia(true);
+    if (failed_ || offset_ >= source_.size()) {
+        if (!failed_) error(offset_, "expected pattern");
+        return nullptr;
+    }
+    const std::size_t begin = offset_;
+    if (consume('[')) return parse_pattern_list(begin);
+    if (consume(':')) return parse_pattern_tag(begin);
+    if (consume('(')) {
+        if (consume(')', true)) return builder_.make(AstKind::Unit, begin, "()");
+        error(begin, "only '()' is valid as a pattern");
+        return nullptr;
+    }
+    if (source_[offset_] == '"') {
+        const std::string_view text = scan_string();
+        std::string decoded;
+        if (!failed_ && !decode_string(text, decoded)) {
+            error(begin, "invalid string pattern");
+            return nullptr;
+        }
+        return failed_ ? nullptr : builder_.make(AstKind::String, begin, text);
+    }
+    const std::string_view number = scan_number();
+    if (!number.empty()) {
+        std::int64_t integer = 0;
+        if (decode_integer(number, integer)) return builder_.make(AstKind::Int, begin, number);
+        double floating = 0.0;
+        if (decode_float(number, floating)) return builder_.make(AstKind::Float, begin, number);
+        error(begin, "invalid numeric pattern");
+        return nullptr;
+    }
+    const std::string_view identifier = scan_identifier();
+    if (identifier == "true" || identifier == "false") {
+        return builder_.make(AstKind::Bool, begin, identifier);
+    }
+    if (identifier == "_") return builder_.make(AstKind::PatternWildcard, begin, identifier);
+    if (!identifier.empty() && !is_keyword(identifier)) {
+        return builder_.make(AstKind::PatternBinding, begin, identifier);
+    }
+    error(begin, "expected pattern");
+    return nullptr;
+}
+
+AstNode* Parser::parse_match(std::size_t begin) {
+    AstNode* subject = parse_expression();
+    if (!subject) return nullptr;
+    if (!consume('{')) {
+        error(offset_, "expected '{' after match value");
+        return nullptr;
+    }
+    AstNode* match = builder_.make(AstKind::Match, begin, "match");
+    match->first = subject;
+    AstNode** tail = &subject->next;
+    consume_terminators();
+    while (!failed_) {
+        skip_trivia(false);
+        if (consume('}', false)) return match;
+        AstNode* pattern = parse_pattern();
+        if (!pattern) return nullptr;
+        if (!consume("=>", true)) {
+            error(offset_, "expected '=>' after match pattern");
+            return nullptr;
+        }
+        AstNode* body = nullptr;
+        if (consume('{')) {
+            body = parse_block(offset_ - 1U);
+        } else {
+            body = parse_expression();
+        }
+        if (!body) return nullptr;
+        AstNode* arm = builder_.make(AstKind::MatchArm, pattern->position.byte_offset);
+        arm->first = pattern;
+        pattern->next = body;
+        *tail = arm;
+        tail = &arm->next;
+        skip_trivia(false);
+        if (consume(',', false)) {
+            consume_terminators();
+            continue;
+        }
+        if (consume('}', false)) return match;
+        if (at_statement_end()) {
+            consume_terminators();
+            continue;
+        }
+        error(offset_, "expected match arm terminator");
+        return nullptr;
+    }
+    return nullptr;
+}
+
 AstNode* Parser::parse_primary() {
     skip_trivia(nesting_depth_ != 0);
     if (failed_ || offset_ >= source_.size()) {
@@ -442,8 +704,10 @@ AstNode* Parser::parse_primary() {
     }
     const std::size_t begin = offset_;
     if (consume("if")) return parse_if(begin);
+    if (consume("match")) return parse_match(begin);
     if (consume('{')) return parse_block(begin);
     if (consume("fn")) return parse_function(begin);
+    if (consume("enum")) return parse_enum(begin);
     if (consume('(')) {
         if (consume(')', true)) return builder_.make(AstKind::Unit, begin, "()");
         return parse_delimited_expression(')', "grouped expression");
@@ -621,6 +885,10 @@ AstNode* Parser::parse_statement() {
     skip_trivia(false);
     const std::size_t begin = offset_;
     if (consume("return")) return parse_return(begin);
+    if (consume("while")) return parse_while(begin);
+    if (consume("for")) return parse_for(begin);
+    if (consume("break")) return builder_.make(AstKind::Break, begin, "break");
+    if (consume("continue")) return builder_.make(AstKind::Continue, begin, "continue");
     if (consume("let")) {
         const std::string_view name = scan_identifier();
         if (name.empty() || is_keyword(name)) {
@@ -637,6 +905,26 @@ AstNode* Parser::parse_statement() {
         AstNode* binding = builder_.make(AstKind::Let, begin, name);
         binding->first = initializer;
         return binding;
+    }
+
+    // spec §9: a statement-leading '~' captures the complete following
+    // expression, including its binary operators, before its follower runs.
+    if (offset_ < source_.size() && source_[offset_] == '~') {
+        std::size_t lookahead = offset_ + 1U;
+        while (lookahead < source_.size() &&
+               (source_[lookahead] == ' ' || source_[lookahead] == '\t')) {
+            ++lookahead;
+        }
+        if (lookahead < source_.size() && source_[lookahead] != '\n' &&
+            source_[lookahead] != '\r' && source_[lookahead] != ';' &&
+            source_[lookahead] != '}') {
+            ++offset_;
+            AstNode* operand = parse_expression();
+            if (!operand) return nullptr;
+            AstNode* effect = builder_.make(AstKind::Unary, begin, "~");
+            effect->first = operand;
+            return effect;
+        }
     }
 
     AstNode* expression = parse_expression();

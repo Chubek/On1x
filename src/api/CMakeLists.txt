@@ -33,7 +33,7 @@ add_library(on1x_shared SHARED
 set_target_properties(on1x_shared PROPERTIES OUTPUT_NAME on1x)
 foreach(target on1x on1x_shared)
   target_include_directories(${target} PUBLIC ${PROJECT_SOURCE_DIR}/include PRIVATE ${PROJECT_SOURCE_DIR}/src)
-  target_link_libraries(${target} PRIVATE on1x_vm on1x_runtime on1x_syntax on1x_core on1x_gc on1x_util)
+  target_link_libraries(${target} PRIVATE on1x_prelude on1x_vm on1x_runtime on1x_syntax on1x_core on1x_gc on1x_util)
   if(ON1X_ENABLE_FFI)
     target_link_libraries(${target} PRIVATE on1x_ffi)
     target_compile_definitions(${target} PRIVATE ON1X_ENABLE_FFI=1)
