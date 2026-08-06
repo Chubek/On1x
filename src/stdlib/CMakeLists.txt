@@ -4,6 +4,11 @@ add_library(on1x_stdlib STATIC
   bit/bit.cpp
   tag/tag.cpp
   str/str.cpp
+  list/list.cpp
+  list/access.cpp
+  list/higher_order.cpp
+  list/sort.cpp
+  list/zip.cpp
   capability.cpp
   module.cpp
   registry.cpp

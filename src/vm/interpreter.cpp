@@ -604,4 +604,22 @@ bool execute(On1x_State* state, const Chunk& chunk, Value& result, const char*& 
     return static_cast<bool>(execute_function(state, chunk, nullptr, nullptr, 0, result, error));
 }
 
+bool invoke_function(
+    On1x_State* state,
+    FunctionObject* function,
+    const Value* arguments,
+    std::size_t argument_count,
+    Value& result,
+    const char*& error) noexcept {
+    if (!state || !function || (!function->native && !function->chunk)) {
+        error = "invalid function";
+        return false;
+    }
+    if (function->native) {
+        return runtime::invoke_native(state, function, arguments, argument_count, result, error);
+    }
+    return static_cast<bool>(execute_function(
+        state, *function->chunk, function, arguments, argument_count, result, error));
+}
+
 }  // namespace on1x::vm

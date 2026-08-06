@@ -35,7 +35,21 @@ int on1x_as_bool(const On1x_State* state, int index) {
 }
 const char* on1x_as_string(const On1x_State* state, int index, size_t* length) {
     on1x::Value value;
-    const auto* text = on1x::stack_at(state, index, value) ? on1x::as_string_const(value) : nullptr;
+    if (!on1x::stack_at(state, index, value)) {
+        if (length) *length = 0;
+        return nullptr;
+    }
+    if (value.kind() == on1x::Value::Kind::Tag) {
+        const auto* tag = on1x::as_tag_const(value);
+        if (tag) {
+            auto text = on1x::tag_text(tag);
+            if (length) *length = text.size();
+            return text.data();
+        }
+        if (length) *length = 0;
+        return nullptr;
+    }
+    const auto* text = on1x::as_string_const(value);
     if (!text) { if (length) *length = 0; return nullptr; }
     if (length) *length = text->bytes;
     return text->data;

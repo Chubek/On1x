@@ -6,12 +6,14 @@
 #include "stdlib/bit/bit.hpp"
 #include "stdlib/tag/tag.hpp"
 #include "stdlib/str/str.hpp"
+#include "stdlib/list/list.hpp"
 
 namespace on1x::stdlib {
 
 const ModuleEntry* modules(std::size_t& count) noexcept {
     static const ModuleEntry entries[] = {
-        {cmp_module()}, {math_module()}, {bit_module()}, {tag_module()}, {str_module()}};
+        {cmp_module()}, {math_module()}, {bit_module()}, {tag_module()}, {str_module()},
+        {list_module()}};
     count = sizeof(entries) / sizeof(entries[0]);
     return entries;
 }

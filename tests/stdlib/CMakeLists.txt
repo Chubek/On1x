@@ -1,0 +1,19 @@
+# stdlib tests use a helper function to deal with static-lib circular deps
+function(on1x_stdlib_test name src)
+  add_executable(${name} ${src})
+  target_link_libraries(${name} PRIVATE on1x)
+  target_link_options(${name} PRIVATE
+    "LINKER:--whole-archive,$<TARGET_FILE:on1x>,--no-whole-archive"
+  )
+  target_include_directories(${name} PRIVATE ${PROJECT_SOURCE_DIR}/include)
+  add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+on1x_stdlib_test(on1x_stdlib_stack_diag test_stack_diag.cpp)
+on1x_stdlib_test(on1x_stdlib_math_domain test_math_domain.cpp)
+on1x_stdlib_test(on1x_stdlib_str_utf8 test_str_utf8.cpp)
+on1x_stdlib_test(on1x_stdlib_cmp_agreement test_cmp_agreement.cpp)
+on1x_stdlib_test(on1x_stdlib_arity_errors test_arity_errors.cpp)
+on1x_stdlib_test(on1x_stdlib_tag test_tag.cpp)
+on1x_stdlib_test(on1x_stdlib_bit test_bit.cpp)
+on1x_stdlib_test(on1x_stdlib_list test_list.cpp)
