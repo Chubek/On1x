@@ -1,0 +1,389 @@
+# On1x language specifications in GDesc format
+# You can compile this file to HTML using `scripts/gdesc2html.py`
+
+@language "On1x"
+@author	  "Chubak Bidpaa <chubakbidpaa@riseup.net>"
+@homepage "https://github.com/Chubek/On1x"
+@summary  "On1x is a minimal scripting language, with focus on embedding"
+
+
+program     ::= top-level+ 
+	     |  directive*
+             ;
+	     @note    "Directives are meta-syntax, implementation-defined"
+	     @warning "Don't mistake directives with REPL directives"
+
+
+top-level   ::= expression
+             |  definition
+	     ;
+	     @repl "Build up until terminated by two semicolons"
+
+expression  ::= unary-expression
+	     |  binary-expression
+	     |  let-expression
+	     |  let-in-expression
+	     |  func-expression
+	     |  ref-expression
+	     |  if-expression
+	     |  unless-expression
+	     |  match-expression
+	     |  for-expression
+	     |  for-in-expression
+	     |  while-expression
+	     |  until-expression
+	     |  spawn-expression
+	     |  wait-expression
+	     |  select-expression
+	     |  scan-expression
+	     |  monadic-expression
+	     |  handle-expression
+	     |  primary-expression
+	     ;
+	     @note   "Monadic expressions simulate statements"
+	     @credit "Scan expressions are due to Paul Kinlt's Summer"
+	     @note   "Handle expressions are algebraic effect handlers"
+
+definition   ::= type-definition
+              |  function-definition
+	      ;
+
+primary-expression ::= literal
+                    |  identifier
+                    |  "(" expression ")"
+                    |  list-expression
+                    |  tuple-expression
+                    |  record-expression
+                    |  block-expression
+                    ;
+
+literal     ::= integer-literal
+             |  float-literal
+             |  string-literal
+             |  char-literal
+             |  boolean-literal
+             |  unit-literal
+             ;
+
+integer-literal ::= decimal-literal
+                 |  hex-literal
+                 |  octal-literal
+                 |  binary-literal
+                 ;
+                 @note "Support for multiple integer bases"
+
+decimal-literal ::= ["-"] digit+
+                 ;
+
+hex-literal ::= "0x" hex-digit+
+             ;
+
+octal-literal ::= "0o" octal-digit+
+               ;
+
+binary-literal ::= "0b" binary-digit+
+                ;
+
+float-literal ::= ["-"] digit+ "." digit+ [exponent]
+               ;
+
+exponent    ::= ("e" | "E") ["-" | "+"] digit+
+             ;
+
+string-literal ::= "\"" string-char* "\""
+                ;
+                @note "Supports escape sequences"
+
+char-literal ::= "'" char "'"
+              ;
+
+boolean-literal ::= "true" | "false"
+                 ;
+
+unit-literal ::= "()"
+              ;
+
+identifier  ::= (letter | "_") (letter | digit | "_")*
+             ;
+             @note "Standard identifier rules"
+
+unary-expression ::= unary-op expression
+                  ;
+
+unary-op    ::= "-" | "!" | "~" | "*" | "&"
+             ;
+             @note "Arithmetic negation, logical not, bitwise not, dereference, reference"
+
+binary-expression ::= expression binary-op expression
+                   ;
+                   @note "Left-associative by default, precedence implementation-defined"
+
+binary-op   ::= arithmetic-op
+             |  comparison-op
+             |  logical-op
+             |  bitwise-op
+             |  assignment-op
+             ;
+
+arithmetic-op ::= "+" | "-" | "*" | "/" | "%" | "**"
+               ;
+
+comparison-op ::= "==" | "!=" | "<" | ">" | "<=" | ">="
+               ;
+
+logical-op  ::= "&&" | "||"
+             ;
+
+bitwise-op  ::= "&" | "|" | "^" | "<<" | ">>"
+             ;
+
+assignment-op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%="
+               |  "&=" | "|=" | "^=" | "<<=" | ">>="
+               ;
+
+let-expression ::= "let" pattern "=" expression
+                ;
+                @note "Variable binding"
+
+let-in-expression ::= "let" pattern "=" expression "in" expression
+                   ;
+                   @note "Scoped let binding"
+
+func-expression ::= "fn" identifier? "(" parameter-list? ")" ["->" type] block-expression
+                 ;
+                 @note "Anonymous or named function"
+
+parameter-list ::= parameter ("," parameter)*
+                ;
+
+parameter   ::= identifier [":" type]
+             ;
+
+ref-expression ::= "&" expression
+                |  "&" "mut" expression
+                ;
+                @note "Immutable and mutable references"
+
+if-expression ::= "if" expression block-expression ["else" (if-expression | block-expression)]
+               ;
+
+unless-expression ::= "unless" expression block-expression ["else" block-expression]
+                   ;
+                   @note "Inverted if condition"
+
+match-expression ::= "match" expression "{" match-arm+ "}"
+                  ;
+
+match-arm   ::= pattern ["if" expression] "=>" expression ","
+             ;
+             @note "Pattern with optional guard"
+
+pattern     ::= literal-pattern
+             |  identifier-pattern
+             |  wildcard-pattern
+             |  tuple-pattern
+             |  list-pattern
+             |  record-pattern
+             |  constructor-pattern
+             ;
+
+literal-pattern ::= literal
+                 ;
+
+identifier-pattern ::= identifier
+                    ;
+
+wildcard-pattern ::= "_"
+                  ;
+
+tuple-pattern ::= "(" pattern ("," pattern)+ ")"
+               ;
+
+list-pattern ::= "[" [pattern ("," pattern)*] "]"
+              |  pattern "::" pattern
+              ;
+              @note "Empty list, list literal, or cons pattern"
+
+record-pattern ::= "{" field-pattern ("," field-pattern)* ["," ".."] "}"
+                ;
+
+field-pattern ::= identifier [":" pattern]
+               ;
+
+constructor-pattern ::= identifier ["(" pattern ("," pattern)* ")"]
+                     ;
+                     @note "Enum/type constructor with optional fields"
+
+for-expression ::= "for" identifier "in" expression block-expression
+                ;
+
+for-in-expression ::= "for" pattern "in" expression block-expression
+                   ;
+                   @note "Pattern destructuring in for loop"
+
+while-expression ::= "while" expression block-expression
+                  ;
+
+until-expression ::= "until" expression block-expression
+                  ;
+                  @note "Inverted while condition"
+
+spawn-expression ::= "spawn" expression
+                  ;
+                  @note "Concurrent task spawning"
+
+wait-expression ::= "wait" expression
+                 ;
+                 @note "Wait for spawned task completion"
+
+select-expression ::= "select" "{" select-arm+ "}"
+                   ;
+                   @note "Concurrent alternative selection"
+
+select-arm  ::= expression "=>" block-expression ","
+             ;
+
+scan-expression ::= "scan" expression "{" scan-arm+ "}"
+                 ;
+                 @credit "Due to Paul Kinlt's Summer language"
+
+scan-arm    ::= pattern "=>" block-expression ","
+             ;
+             @note "Pattern-based scanning/parsing"
+
+monadic-expression ::= "do" "{" monadic-statement+ "}"
+                    ;
+                    @note "Simulates imperative statements in pure context"
+
+monadic-statement ::= expression ";"
+                   |  "let" pattern "<-" expression ";"
+                   |  "return" expression ";"
+                   ;
+
+handle-expression ::= "handle" expression "{" handler+ "}"
+                   ;
+                   @note "Algebraic effect handling"
+
+handler     ::= effect-clause
+             |  return-clause
+             ;
+
+effect-clause ::= "effect" identifier "(" parameter-list? ")" "=>" block-expression
+               ;
+
+return-clause ::= "return" identifier "=>" block-expression
+               ;
+
+list-expression ::= "[" [expression ("," expression)*] "]"
+                 ;
+
+tuple-expression ::= "(" expression ("," expression)+ ")"
+                  ;
+
+record-expression ::= "{" field-init ("," field-init)* "}"
+                   ;
+
+field-init  ::= identifier ":" expression
+             |  identifier
+             ;
+             @note "Short form when field name matches variable"
+
+block-expression ::= "{" statement* [expression] "}"
+                  ;
+                  @note "Last expression is block value"
+
+statement   ::= expression ";"
+             |  let-expression ";"
+             |  definition
+             ;
+
+type-definition ::= "type" identifier [type-params] "=" type
+                 |  "type" identifier [type-params] "=" "{" field-decl ("," field-decl)* "}"
+                 |  "type" identifier [type-params] "=" variant ("|" variant)*
+                 ;
+                 @note "Type alias, record type, or enum type"
+
+type-params ::= "<" identifier ("," identifier)* ">"
+             ;
+
+field-decl  ::= identifier ":" type
+             ;
+
+variant     ::= identifier ["(" type ("," type)* ")"]
+             ;
+
+function-definition ::= "fn" identifier [type-params] "(" parameter-list? ")" ["->" type] block-expression
+                     ;
+
+type        ::= primitive-type
+             |  identifier
+             |  function-type
+             |  tuple-type
+             |  list-type
+             |  reference-type
+             |  generic-type
+             |  "(" type ")"
+             ;
+
+primitive-type ::= "i32" | "i64" | "f32" | "f64" | "bool" | "char" | "str" | "unit"
+                ;
+
+function-type ::= "(" [type ("," type)*] ")" "->" type
+               ;
+
+tuple-type  ::= "(" type ("," type)+ ")"
+             ;
+
+list-type   ::= "[" type "]"
+             ;
+
+reference-type ::= "&" [lifetime] ["mut"] type
+                ;
+
+lifetime    ::= "'" identifier
+             ;
+             @note "Optional lifetime annotation"
+
+generic-type ::= identifier "<" type ("," type)* ">"
+              ;
+
+directive   ::= "#" directive-name [directive-args]
+             ;
+             @note "Implementation-defined meta-directives"
+
+directive-name ::= identifier
+                ;
+
+directive-args ::= "(" expression ("," expression)* ")"
+                ;
+
+digit       ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+             ;
+
+hex-digit   ::= digit | "a" | "b" | "c" | "d" | "e" 
+| "f" | "A" | "B" | "C" | "D" | "E" | "F"
+             ;
+
+octal-digit ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7"
+             ;
+
+binary-digit ::= "0" | "1"
+              ;
+
+letter      ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+             |  "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+             |  "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+             |  "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+             ;
+
+char        ::= escape-seq
+             |  [^'\\]
+             ;
+
+string-char ::= escape-seq
+             |  [^"\\]
+             ;
+
+escape-seq  ::= "\\" ( "\"" | "'" | "\\" | "n" | "r" | "t" | "0" | "x" hex-digit hex-digit | "u{" hex-digit+ "}" )
+             ;
+             @note "Standard escape characters, hex and unicode escapes"
