@@ -40,6 +40,7 @@ expression  ::= unary-expression
 	     |  handle-expression
 	     |  primary-expression
 	     |  module-expression
+	     |  operator-expression
 	     ;
 	     @note   "Monadic expressions simulate statements"
 	     @credit "Scan expressions are due to Paul Kinlt's Summer"
@@ -62,6 +63,12 @@ primary-expression ::= literal
                     |  record-expression
                     |  block-expression
                     ;
+
+operator-expression ::= "infix" punctuation+ digit
+                     |  "infixr" punctuation+ digit
+		     ;
+		     @note "Only between 2 to 4 punctuations"
+		     @note "Digit defines precedence"
 
 literal     ::= integer-literal
              |  float-literal
@@ -366,6 +373,8 @@ directive-name ::= identifier
 
 directive-args ::= "(" expression ("," expression)* ")"
                 ;
+
+punctuation ::= ? any punctuation in ASCII ?
 
 digit       ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
              ;
