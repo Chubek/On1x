@@ -1,0 +1,134 @@
+%YAML 1.2
+---
+# On1x Syntax Definition for Sublime Text
+name: On1x
+file_extensions:
+  - on1x
+scope: source.on1x
+
+contexts:
+  main:
+    - include: comments
+    - include: strings
+    - include: numbers
+    - include: keywords
+    - include: types
+    - include: constants
+    - include: operators
+    - include: function-declaration
+    - include: module-declaration
+
+  comments:
+    - match: '--'
+      scope: punctuation.definition.comment.on1x
+      push:
+        - meta_scope: comment.line.double-dash.on1x
+        - match: $
+          pop: true
+
+    - match: '\{-'
+      scope: punctuation.definition.comment.begin.on1x
+      push:
+        - meta_scope: comment.block.on1x
+        - match: '-\}'
+          scope: punctuation.definition.comment.end.on1x
+          pop: true
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.on1x
+      push:
+        - meta_scope: string.quoted.double.on1x
+        - match: '\\.'
+          scope: constant.character.escape.on1x
+        - match: '"'
+          scope: punctuation.definition.string.end.on1x
+          pop: true
+
+    - match: "'"
+      scope: punctuation.definition.string.begin.on1x
+      push:
+        - meta_scope: string.quoted.single.on1x
+        - match: '\\.'
+          scope: constant.character.escape.on1x
+        - match: "'"
+          scope: punctuation.definition.string.end.on1x
+          pop: true
+
+  numbers:
+    - match: '\b0[xX][0-9a-fA-F]+\b'
+      scope: constant.numeric.hex.on1x
+    - match: '\b0[oO][0-7]+\b'
+      scope: constant.numeric.octal.on1x
+    - match: '\b0[bB][01]+\b'
+      scope: constant.numeric.binary.on1x
+    - match: '\b\d+\.\d+([eE][+-]?\d+)?\b'
+      scope: constant.numeric.float.on1x
+    - match: '\b\d+\b'
+      scope: constant.numeric.integer.on1x
+
+  keywords:
+    - match: '\b(let|in|fun|if|then|else|match|with|case|of|do|end)\b'
+      scope: keyword.control.on1x
+    - match: '\b(type|effect|handler|handle|resume|abort)\b'
+      scope: keyword.declaration.on1x
+    - match: '\b(import|module|where|export|exposing)\b'
+      scope: keyword.other.on1x
+    - match: '\b(rec|and|as)\b'
+      scope: keyword.other.on1x
+    - match: '\b(forall|exists)\b'
+      scope: keyword.operator.quantifier.on1x
+
+  types:
+    - match: '\b(Int|Float|Double|Bool|Char|String|Unit)\b'
+      scope: support.type.primitive.on1x
+    - match: '\b(List|Vector|Option|Result|Either|Maybe)\b'
+      scope: support.type.container.on1x
+    - match: '\b(IO|State|Reader|Writer|Concurrent|Async)\b'
+      scope: support.type.effect.on1x
+    - match: '\b(Map|Set|Queue|Stack|Tree|Graph)\b'
+      scope: support.type.collection.on1x
+    - match: '\b[A-Z][A-Za-z0-9_]*\b'
+      scope: entity.name.type.on1x
+
+  constants:
+    - match: '\b(true|false)\b'
+      scope: constant.language.boolean.on1x
+    - match: '\b(None|Some|Ok|Err|Left|Right|Just|Nothing)\b'
+      scope: constant.language.constructor.on1x
+    - match: '\(\)'
+      scope: constant.language.unit.on1x
+
+  operators:
+    - match: '(\+\+|::|\||>|<\||>>|<<|<-|->|=>|<=|>=|==|!=|&&|\|\|)'
+      scope: keyword.operator.on1x
+    - match: '(\+|-|\*|/|%|\^)'
+      scope: keyword.operator.arithmetic.on1x
+    - match: '(<|>|=)'
+      scope: keyword.operator.comparison.on1x
+    - match: '(\.|\$|@|#|~)'
+      scope: keyword.operator.other.on1x
+    - match: '(\||&|!)'
+      scope: keyword.operator.logical.on1x
+
+  function-declaration:
+    - match: '\b(fun|let)\s+([a-z_][A-Za-z0-9_]*)\b'
+      captures:
+        1: keyword.declaration.function.on1x
+        2: entity.name.function.on1x
+
+  module-declaration:
+    - match: '\b(module)\s+([A-Z][A-Za-z0-9_.]*)\b'
+      captures:
+        1: keyword.other.module.on1x
+        2: entity.name.namespace.on1x
+    - match: '\b(import)\s+([A-Z][A-Za-z0-9_.]*)\b'
+      captures:
+        1: keyword.other.import.on1x
+        2: entity.name.namespace.on1x
+
+  punctuation:
+    - match: '[(){}\[\]]'
+      scope: punctuation.section.on1x
+    - match: '[,;:]'
+      scope: punctuation.separator.on1x
