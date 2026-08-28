@@ -34,6 +34,13 @@ contexts:
           scope: punctuation.definition.comment.end.on1x
           pop: true
 
+     - match: '\/\/'
+       scope: punctuation.definition.comment.on1x
+       push:
+         - meta_scope: comment.line.on1x
+         - match: '$'
+           pop: true
+
   strings:
     - match: '"'
       scope: punctuation.definition.string.begin.on1x
