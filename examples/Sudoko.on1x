@@ -1,0 +1,315 @@
+// Sudoku.on1x
+// Sudoku puzzle solver using backtracking in On1x
+
+module Sudoku where
+
+import std.collections.List as L
+import std.collections.Vector as V
+import std.collections.Set as S
+import std.core.Option as Opt
+import std.core.Ordering
+
+// A Sudoku board is represented as a 9x9 grid
+// Each cell contains either a known digit (1-9) or None (empty)
+type Cell = Option[Int]
+type Row = Vector[Cell]
+type Board = Vector[Row]
+
+// Position on the board
+type Pos = (Int, Int)
+
+// Constants
+val BOARD_SIZE: Int = 9
+val SUBGRID_SIZE: Int = 3
+
+// Create an empty board
+fn emptyBoard() -> Board =
+  V.replicate(BOARD_SIZE, V.replicate(BOARD_SIZE, None))
+
+// Get cell at position
+fn getCell(board: Board, pos: Pos) -> Cell =
+  let (row, col) = pos in
+  V.get(V.get(board, row), col)
+
+// Set cell at position
+fn setCell(board: Board, pos: Pos, value: Cell) -> Board =
+  let (row, col) = pos in
+  let currentRow = V.get(board, row) in
+  let newRow = V.set(currentRow, col, value) in
+  V.set(board, row, newRow)
+
+// Check if a digit is valid in a given position
+fn isValid(board: Board, pos: Pos, digit: Int) -> Bool =
+  let (row, col) = pos in
+  
+  // Check row
+  let rowValid = V.all(
+    V.get(board, row),
+    fn(cell) => match cell with
+      | None -> true
+      | Some(d) -> d != digit
+    end
+  ) in
+  
+  // Check column
+  let colValid = V.all(
+    V.map(board, fn(r) => V.get(r, col)),
+    fn(cell) => match cell with
+      | None -> true
+      | Some(d) -> d != digit
+    end
+  ) in
+  
+  // Check 3x3 subgrid
+  let subgridRow = (row / SUBGRID_SIZE) * SUBGRID_SIZE in
+  let subgridCol = (col / SUBGRID_SIZE) * SUBGRID_SIZE in
+  
+  let subgridValid = 
+    let rec checkSubgrid = fn(r: Int, c: Int) -> Bool =>
+      if r >= subgridRow + SUBGRID_SIZE then
+        true
+      else if c >= subgridCol + SUBGRID_SIZE then
+        checkSubgrid(r + 1, subgridCol)
+      else
+        match getCell(board, (r, c)) with
+        | None -> checkSubgrid(r, c + 1)
+        | Some(d) -> 
+            if d == digit then
+              false
+            else
+              checkSubgrid(r, c + 1)
+        end
+    in
+    checkSubgrid(subgridRow, subgridCol)
+  in
+  
+  rowValid && colValid && subgridValid
+
+// Find the next empty cell
+fn findEmpty(board: Board) -> Option[Pos] =
+  let rec search = fn(row: Int, col: Int) -> Option[Pos] =>
+    if row >= BOARD_SIZE then
+      None
+    else if col >= BOARD_SIZE then
+      search(row + 1, 0)
+    else
+      match getCell(board, (row, col)) with
+      | None -> Some((row, col))
+      | Some(_) -> search(row, col + 1)
+      end
+  in
+  search(0, 0)
+
+// Solve the Sudoku puzzle using backtracking
+fn solve(board: Board) -> Option[Board] =
+  match findEmpty(board) with
+  | None -> Some(board)  // No empty cells, puzzle solved
+  | Some(pos) ->
+      // Try digits 1-9
+      let rec tryDigit = fn(digit: Int) -> Option[Board] =>
+        if digit > 9 then
+          None  // No valid digit found
+        else if isValid(board, pos, digit) then
+          // Place digit and recurse
+          let newBoard = setCell(board, pos, Some(digit)) in
+          match solve(newBoard) with
+          | Some(solution) -> Some(solution)
+          | None -> tryDigit(digit + 1)  // Backtrack
+          end
+        else
+          tryDigit(digit + 1)
+      in
+      tryDigit(1)
+  end
+
+// Parse a board from a list of lists
+// 0 represents an empty cell, 1-9 are given digits
+fn parseBoard(rows: List[List[Int]]) -> Board =
+  V.fromList(
+    L.map(rows, fn(row) =>
+      V.fromList(
+        L.map(row, fn(n) =>
+          if n == 0 then None else Some(n)
+        )
+      )
+    )
+  )
+
+// Convert board to string for display
+fn boardToString(board: Board) -> String =
+  let rowToString = fn(row: Row) -> String =>
+    let cells = V.toList(V.map(row, fn(cell) =>
+      match cell with
+      | None -> "."
+      | Some(d) -> show(d)
+      end
+    )) in
+    L.intercalate(" ", cells)
+  in
+  
+  let rows = V.toList(V.map(board, rowToString)) in
+  L.intercalate("\n", rows)
+
+// Pretty print with grid lines
+fn prettyPrint(board: Board) -> Unit =
+  let printSeparator = fn() =>
+    println("------+-------+------") 
+  in
+  
+  let rec printRows = fn(i: Int) -> Unit =>
+    if i >= BOARD_SIZE then
+      ()
+    else
+      let _ = 
+        if i > 0 && i % SUBGRID_SIZE == 0 then
+          printSeparator()
+        else
+          ()
+      in
+      
+      let row = V.get(board, i) in
+      let rowStr = V.foldli(
+        row,
+        "",
+        fn(acc, j, cell) =>
+          let sep = if j > 0 && j % SUBGRID_SIZE == 0 then " | " else " " in
+          let cellStr = match cell with
+            | None -> "."
+            | Some(d) -> show(d)
+          end in
+          acc ++ sep ++ cellStr
+      ) in
+      
+      println(rowStr);
+      printRows(i + 1)
+  in
+  
+  printRows(0)
+
+// Count the number of solutions (for uniqueness checking)
+fn countSolutions(board: Board, limit: Int) -> Int =
+  let rec count = fn(b: Board, found: Int) -> Int =>
+    if found >= limit then
+      found  // Early exit if we've found enough
+    else
+      match findEmpty(b) with
+      | None -> found + 1  // Found a solution
+      | Some(pos) ->
+          let rec tryDigits = fn(digit: Int, acc: Int) -> Int =>
+            if digit > 9 || acc >= limit then
+              acc
+            else if isValid(b, pos, digit) then
+              let newBoard = setCell(b, pos, Some(digit)) in
+              let newCount = count(newBoard, acc) in
+              tryDigits(digit + 1, newCount)
+            else
+              tryDigits(digit + 1, acc)
+          in
+          tryDigits(1, found)
+      end
+  in
+  count(board, 0)
+
+// Check if a puzzle has a unique solution
+fn hasUniqueSolution(board: Board) -> Bool =
+  countSolutions(board, 2) == 1
+
+// Example puzzles
+fn easyPuzzle() -> Board =
+  parseBoard([
+    [5, 3, 0, 0, 7, 0, 0, 0, 0],
+    [6, 0, 0, 1, 9, 5, 0, 0, 0],
+    [0, 9, 8, 0, 0, 0, 0, 6, 0],
+    [8, 0, 0, 0, 6, 0, 0, 0, 3],
+    [4, 0, 0, 8, 0, 3, 0, 0, 1],
+    [7, 0, 0, 0, 2, 0, 0, 0, 6],
+    [0, 6, 0, 0, 0, 0, 2, 8, 0],
+    [0, 0, 0, 4, 1, 9, 0, 0, 5],
+    [0, 0, 0, 0, 8, 0, 0, 7, 9]
+  ])
+
+fn hardPuzzle() -> Board =
+  parseBoard([
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 3, 0, 8, 5],
+    [0, 0, 1, 0, 2, 0, 0, 0, 0],
+    [0, 0, 0, 5, 0, 7, 0, 0, 0],
+    [0, 0, 4, 0, 0, 0, 1, 0, 0],
+    [0, 9, 0, 0, 0, 0, 0, 0, 0],
+    [5, 0, 0, 0, 0, 0, 0, 7, 3],
+    [0, 0, 2, 0, 1, 0, 0, 0, 0],
+    [0, 0, 0, 0, 4, 0, 0, 0, 9]
+  ])
+
+// Main demonstration
+fn main() -> Unit =
+  println("=== Sudoku Solver ===\n");
+  
+  println("Easy Puzzle:");
+  let easy = easyPuzzle() in
+  prettyPrint(easy);
+  
+  println("\nSolving...\n");
+  
+  match solve(easy) with
+  | None -> println("No solution found!")
+  | Some(solution) ->
+      println("Solution:");
+      prettyPrint(solution);
+      
+      let isUnique = hasUniqueSolution(easy) in
+      println("\nUnique solution: " ++ show(isUnique))
+  end;
+  
+  println("\n" ++ "=" * 40 ++ "\n");
+  
+  println("Hard Puzzle:");
+  let hard = hardPuzzle() in
+  prettyPrint(hard);
+  
+  println("\nSolving...\n");
+  
+  match solve(hard) with
+  | None -> println("No solution found!")
+  | Some(solution) ->
+      println("Solution:");
+      prettyPrint(solution)
+  end;
+  
+  ()
+
+// Validate a completed board
+fn isValidSolution(board: Board) -> Bool =
+  let allFilled = V.all(
+    V.map(board, fn(row) =>
+      V.all(row, fn(cell) => match cell with
+        | None -> false
+        | Some(_) -> true
+      end)
+    ),
+    fn(b) => b
+  ) in
+  
+  if not allFilled then
+    false
+  else
+    // Check all positions have valid placements
+    let rec checkPos = fn(row: Int, col: Int) -> Bool =>
+      if row >= BOARD_SIZE then
+        true
+      else if col >= BOARD_SIZE then
+        checkPos(row + 1, 0)
+      else
+        match getCell(board, (row, col)) with
+        | None -> false  // Shouldn't happen if allFilled
+        | Some(digit) ->
+            // Temporarily remove the digit and check validity
+            let tempBoard = setCell(board, (row, col), None) in
+            if isValid(tempBoard, (row, col), digit) then
+              checkPos(row, col + 1)
+            else
+              false
+        end
+    in
+    checkPos(0, 0)
+  end

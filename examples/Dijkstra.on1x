@@ -1,0 +1,241 @@
+// Dijkstra.on1x
+// Dijkstra's shortest path algorithm implementation in On1x
+
+module Dijkstra where
+
+import std.collections.List as L
+import std.collections.Map as M
+import std.collections.Set as S
+import std.collections.Heap as H
+import std.core.Option as Opt
+import std.core.Ordering
+
+// Graph represented as adjacency list: Map from node to list of (neighbor, weight) pairs
+type Graph[N] = Map[N, List[(N, Int)]]
+
+// Distance map: tracks shortest known distance to each node
+type DistMap[N] = Map[N, Int]
+
+// Priority queue entry: (distance, node)
+type PQEntry[N] = (Int, N)
+
+// Result type: shortest distances from source to all reachable nodes
+type ShortestPaths[N] = Map[N, Int]
+
+// Compare entries by distance (min-heap)
+fn comparePQEntry[N](a: PQEntry[N], b: PQEntry[N]) -> Ordering =
+  let (distA, _) = a in
+  let (distB, _) = b in
+  compare(distA, distB)
+
+// Get neighbors of a node in the graph
+fn getNeighbors[N: Ord](graph: Graph[N], node: N) -> List[(N, Int)] =
+  M.get(graph, node) 
+  |> Opt.unwrapOr([])
+
+// Dijkstra's algorithm main implementation
+fn dijkstra[N: Ord](graph: Graph[N], source: N) -> ShortestPaths[N] =
+  let initialDist = M.singleton(source, 0) in
+  let initialPQ = H.singleton((0, source), comparePQEntry) in
+  let initialVisited = S.empty[N]
+  let initialPQ = H.singleton((0, source), comparePQEntry) in
+  let initialVisited = S.empty[N]() in
+  
+  let rec loop = fn.extractMin(pq) with
+    | None -> dist  // Priority queue empty, done
+    | Some((currentDist, currentNode), restPQ) ->
+        if S.member(visited, currentNode) then
+          // Already processed this node, skip
+          loop(restPQ, dist, visited)
+        else
+          // Mark node as visited
+          let newVisited = S.insert(visited, currentNode) in
+          
+          // Get neighbors and relax edges
+          let neighbors = getNeighbors(graph, currentNode) in
+          
+          // Fold over neighbors to update distances and priority queue
+          let (newPQ, newDist) = 
+            L.foldl(
+              fn(acc, neighbor) =>
+                let (accPQ, accDist) = acc in
+                let (nextNode, edgeWeight) = neighbor in
+                let newDistance = currentDist + edgeWeight in
+                
+                // Check if we found a shorter path
+                let shouldUpdate = match M.get(accDist, nextNode) with
+                  | None -> true  // Node not yet reached
+                  | Some(oldDist) -> newDistance < oldDist
+                end in
+                
+                if shouldUpdate then
+                  // Update distance and add to priority queue
+                  let updatedDist = M.insert(accDist, nextNode, newDistance) in
+                  let updatedPQ = H.insert(accPQ, (newDistance, nextNode)) in
+                  (updatedPQ, updatedDist)
+                else
+                  acc,
+              (restPQ, dist),
+              neighbors
+            )
+          in
+          
+          // Continue with updated state
+          loop(newPQ, newDist, newVisited)
+    end
+  in
+  
+  loop(initialPQ, initialDist, initialVisited)
+
+// Find shortest path from source to target
+fn shortestPath[N: Ord](graph: Graph[N], source: N, target: N) 
+  -> Option[Int] =
+  let distances = dijkstra(graph, source) in
+  M.get(distances, target)
+
+// Build a graph from edge list
+fn graphFromEdges[N: Ord](edges: List[(N, N, Int)]) -> Graph[N] =
+  L.foldl(
+    fn(graph, edge) =>
+      let (from, to, weight) = edge in
+      let currentNeighbors = M.get(graph, from) |> Opt.unwrapOr([]) in
+      let newNeighbors = (to, weight) :: currentNeighbors in
+      M.insert(graph, from, newNeighbors),
+    M.empty[N, List[(N, Int)]](),
+    edges
+  )
+
+// Example: Find all shortest paths from a node
+fn allShortestPaths[N: Ord + Show](graph: Graph[N], source: N) -> Unit =
+  let paths = dijkstra(graph, source) in
+  println("Shortest paths from " ++ show(source) ++ ":");
+  M.forEach(paths, fn(node, dist) =>
+    println("  to " ++ show(node) ++ ": " ++ show(dist))
+  );
+  ()
+
+// Main example
+fn main() -> Unit =
+  // Build example graph:
+  //     7      9      14
+  //  A --- B --- C --- D
+  //  |     |     |     |
+  //  10    15    11    6
+  //  |     |     |     |
+  //  E --- F --- G --- H
+  //     2      1      9
+  
+  let edges = [
+    ("A", "B", 7),   ("B", "A", 7),
+    ("B", "C", 9),   ("C", "B", 9),
+    ("C", "D", 14),  ("D", "C", 14),
+    ("A", "E", 10),  ("E", "A", 10),
+    ("B", "F", 15),  ("F", "B", 15),
+    ("C", "G", 11),  ("G", "C", 11),
+    ("D", "H", 6),   ("H", "D", 6),
+    ("E", "F", 2),   ("F", "E", 2),
+    ("F", "G", 1),   ("G", "F", 1),
+    ("G", "H", 9),   ("H", "G", 9)
+  ] in
+  
+  let graph = graphFromEdges(edges) in
+  
+  println("=== Dijkstra's Algorithm Demo ===\n");
+  
+  // Find all shortest paths from A
+  allShortestPaths(graph, "A");
+  
+  println("");
+  
+  // Find specific path from A to H
+  match shortestPath(graph, "A", "H") with
+  | None -> println("No path from A to H")
+  | Some(dist) -> println("Shortest path A -> H: " ++ show(dist))
+  end;
+  
+  println("");
+  
+  // Another example: find path from C to E
+  match shortestPath(graph, "C", "E") with
+  | None -> println("No path from C to E")
+  | Some(dist) -> println("Shortest path C -> E: " ++ show(dist))
+  end;
+  
+  ()
+
+// Variant: Dijkstra with path reconstruction
+type PathInfo[N] = { distance: Int, predecessor: Option[N] }
+
+fn dijkstraWithPath[N: Ord](graph: Graph[N], source: N) 
+  -> Map[N, PathInfo[N]] =
+  let initialInfo = M.singleton(source, { distance = 0, predecessor = None }) in
+  let initialPQ = H.singleton((0, source), comparePQEntry) in
+  let initialVisited = S.empty[N]() in
+  
+  let rec loop = fn(pq: Heap[PQEntry[N]], 
+                     info: Map[N, PathInfo[N]], 
+                     visited: Set[N]) -> Map[N, PathInfo[N]] =>
+    match H.extractMin(pq) with
+    | None -> info
+    | Some((currentDist, currentNode), restPQ) ->
+        if S.member(visited, currentNode) then
+          loop(restPQ, info, visited)
+        else
+          let newVisited = S.insert(visited, currentNode) in
+          let neighbors = getNeighbors(graph, currentNode) in
+          
+          let (newPQ, newInfo) = 
+            L.foldl(
+              fn(acc, neighbor) =>
+                let (accPQ, accInfo) = acc in
+                let (nextNode, edgeWeight) = neighbor in
+                let newDistance = currentDist + edgeWeight in
+                
+                let shouldUpdate = match M.get(accInfo, nextNode) with
+                  | None -> true
+                  | Some(oldInfo) -> newDistance < oldInfo.distance
+                end in
+                
+                if shouldUpdate then
+                  let updatedInfo = M.insert(
+                    accInfo, 
+                    nextNode, 
+                    { distance = newDistance, predecessor = Some(currentNode) }
+                  ) in
+                  let updatedPQ = H.insert(accPQ, (newDistance, nextNode)) in
+                  (updatedPQ, updatedInfo)
+                else
+                  acc,
+              (restPQ, info),
+              neighbors
+            )
+          in
+          
+          loop(newPQ, newInfo, newVisited)
+    end
+  in
+  
+  loop(initialPQ, initialInfo, initialVisited)
+
+// Reconstruct path from source to target
+fn reconstructPath[N: Ord](pathInfo: Map[N, PathInfo[N]], 
+                           source: N, 
+                           target: N) -> Option[List[N]] =
+  match M.get(pathInfo, target) with
+  | None -> None  // Target not reachable
+  | Some(_) ->
+      let rec buildPath = fn(current: N, acc: List[N]) -> List[N] =>
+        if current == source then
+          current :: acc
+        else
+          match M.get(pathInfo, current) with
+          | Some(info) ->
+              match info.predecessor with
+              | Some(prev) -> buildPath(prev, current :: acc)
+              | None -> current :: acc  // Shouldn't happen if reachable
+              end
+          | None -> current :: acc  // Shouldn't happen
+          end
+      in
+      Some(buildPath(target, []))
+  end

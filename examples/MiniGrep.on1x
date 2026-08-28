@@ -1,0 +1,416 @@
+// MiniGrep.on1x
+// A simple grep-like text search utility in On1x
+
+module MiniGrep where
+
+import std.io.File as F
+import std.io.Console as C
+import std.string.String as S
+import std.collections.List as L
+import std.collections.Vector as V
+import std.core.Option as Opt
+import std.core.Result as R
+import std.system.Env as Env
+
+// Configuration for the search
+type Config = {
+  query: String,
+  filename: String,
+  case_sensitive: Bool,
+  line_numbers: Bool,
+  invert_match: Bool,
+  count_only: Bool
+}
+
+// A search result containing the line and its metadata
+type SearchResult = {
+  line_number: Int,
+  content: String,
+  match_start: Int,
+  match_end: Int
+}
+
+// Parse command-line arguments into a Config
+fn parseArgs(args: List[String]) -> Result[Config, String] =
+  match args with
+  | [] -> Err("Usage: minigrep [OPTIONS] PATTERN FILE")
+  | _ ->
+      let rec parseOptions = fn(remaining: List[String], cfg: Config) -> Result[Config, String] =>
+        match remaining with
+        | [] -> 
+            if S.isEmpty(cfg.query) || S.isEmpty(cfg.filename) then
+              Err("Missing required arguments: PATTERN and FILE")
+            else
+              Ok(cfg)
+        
+        | "-i" :: rest -> 
+            parseOptions(rest, { cfg with case_sensitive = false })
+        
+        | "-n" :: rest -> 
+            parseOptions(rest, { cfg with line_numbers = true })
+        
+        | "-v" :: rest -> 
+            parseOptions(rest, { cfg with invert_match = true })
+        
+        | "-c" :: rest -> 
+            parseOptions(rest, { cfg with count_only = true })
+        
+        | pattern :: file :: rest ->
+            if not (S.isEmpty(cfg.query)) then
+              Err("Too many arguments")
+            else
+              parseOptions(rest, {
+                query = pattern,
+                filename = file,
+                case_sensitive = cfg.case_sensitive,
+                line_numbers = cfg.line_numbers,
+                invert_match = cfg.invert_match,
+                count_only = cfg.count_only
+              })
+        
+        | arg :: _ ->
+            Err("Invalid argument: " ++ arg)
+        end
+      in
+      
+      let defaultConfig = {
+        query = "",
+        filename = "",
+        case_sensitive = true,
+        line_numbers = false,
+        invert_match = false,
+        count_only = false
+      } in
+      
+      parseOptions(args, defaultConfig)
+  end
+
+// Check if a line matches the query
+fn matchesQuery(line: String, query: String,ower(line) in
+  lease_sensitive: Bool) -> Bool =
+  let searchLine = if case_sensitive then line else S.toLower(line) in
+  let searchQuery = if case_sensitive then query else S.toLower(query) in
+  S.contains(searchLine, searchQuery)
+
+// Find the position of the match in a line
+fn findMatch(line: String, query: String, case_sensitive: Bool) -> Option[(Int, Int)] =
+  let searchLine = if case_sensitive then line else S.toLower(line) in
+  let searchQuery = if case_sensitive then query else S.toLower(query) in
+  
+  match S.indexOf(searchLine, searchQuery) with
+  | None -> None
+  | Some(start) -> Some((start, start + S.length(searchQuery)))
+  end
+
+// Search a single line
+fn searchLine(
+  line: String,
+  lineNum: Int,
+  query: String,
+  config: Config
+) -> Option[SearchResult] =
+  let matches = matchesQuery(line, query, config.case_sensitive) in
+  let shouldInclude = if config.invert_match then not matches else matches in
+  
+  if shouldInclude then
+    match findMatch(line, query, config.case_sensitive) with
+    | None ->
+        // For inverted matches, there's no actual match position
+        Some({
+          line_number = lineNum,
+          content = line,
+          match_start = -1,
+          match_end = -1
+        })
+    | Some((start, end)) ->
+        Some({
+          line_number = lineNum,
+          content = line,
+          match_start = start,
+          match_end = end
+        })
+    end
+  else
+    None
+
+// Search all lines in the content
+fn search(content: String, config: Config) -> List[SearchResult] =
+  let lines = S.lines(content) in
+  let indexed = L.zipWithIndex(lines) in
+  
+  L.filterMap(indexed, fn((line, idx)) =>
+    searchLine(line, idx + 1, config.query, config)
+  )
+
+// Format a single search result for display
+fn formatResult(result: SearchResult, showLineNumbers: Bool) -> String =
+  let prefix = if showLineNumbers then
+    show(result.line_number) ++ ":"
+  else
+    ""
+  in
+  
+  prefix ++ result.content
+
+// Highlight the matched portion (simple version using markers)
+fn formatResultWithHighlight(result: SearchResult, showLineNumbers: Bool) -> String =
+  if result.match_start < 0 then
+    formatResult(result, showLineNumbers)
+  else
+    let prefix = if showLineNumbers then
+      show(result.line_number) ++ ":"
+    else
+      ""
+    in
+    
+    let before = S.substring(result.match_start < 0 then
+    formatResult(result, showLineNumbers)
+  else
+    let prefix = if showLineNumbers then
+      show(result.line_number) ++ ":"
+    else
+      ""
+    in
+    
+    let before = S.substring(result.content, 0, result.match_start) in
+    let matched = S.substring(
+      result.content,
+      result.match_start,
+      result.match_end
+    ) in" ++ after
+
+// Display results
+fn displayResults(results: List[SearchResult], config: Config) -> Unit =
+  if config.count_only then
+    println(show(L.length(results)))
+  else
+    L.foreach(results, fn(result) =>
+      println(formatResultWithHighlight(result, config.line_numbers))
+    );
+    show(L.length(results)))
+  else
+    L.foreach(results, fn(result) =>
+      println(formatResultWithHighlight(result, config.line_numbers))
+    );
+    ()
+
+// Read file content
+fn readFile(filename: String) -> Result[String, String] =
+  match F.readT(e))
+  end
+
+// Main search pipeline
+fn runSearch(config: Config) -> Result[Unit, String] =
+  do content <- readFile(config.filename);
+  
+  let results = search(content, config) in
+  
+  displayResults(results, config);
+  
+  Ok(())
+
+// Print help message
+fn printHelp() -> Unit =
+  println("MiniGrep - A simple text search utility");
+  println("");
+  println("USAGE:");
+  println("    minigrep [OPTIONS] PATTERN FILE");
+  println("");
+  println("OPTIONS:");
+  println("    -i              Case-insensitive search");
+  println("    -n              Show line numbers");
+  println("    -v              Invert match (show non-matching lines)");
+  println("    -c              Count only (show number of matches)");
+  println("");
+  println("EXAMPLES:");
+  println("    minigrep \"error\" log.txt");
+  println("    minigrep -i \"warning\" log.txt");
+  println("    minigrep -n \"TODO\" src/main.on1x");
+  println("    minigrep -c \"failed\" test_results.txt");
+  ()
+
+// Main entry point
+fn main() -> Unit =
+  let args = Env.getArgs() in
+  
+  // Skip program name (first argument)
+  let userArgs = match args with
+    | [] -> []
+    | _ :: rest -> rest
+  end in
+  
+  // Check for help flag
+  if L.any(userArgs, fn(arg) => arg == "-h" || arg == "--help") then
+    printHelp()
+  else
+    match parseArgs(userArgs) with
+    | Err(msg) ->
+        C.eprintln("Error: " ++ msg);
+        C.eprintln("");
+        printHelp()
+    
+    | Ok(config) ->
+        match runSearch(config) with
+        | Ok(_) -> ()
+        | Err(msg) -> C.eprintln("Error: " ++ msg)
+        end
+    end;
+  
+  ()
+
+// Utility function to search within a string (for library use)
+fn grepString(text: String, pattern: String, caseSensitive: Bool) -> List[String] =
+  let lines = S.lines(text) in
+  L.filter(lines, fn(line) =>
+    matchesQuery(line, pattern, caseSensitive)
+  )
+
+// Count matches in a string
+fn countMatches(text: String, pattern: String, caseSensitive: Bool) -> Int =
+  let lines = S.lines(text) in
+  L.length(L.filter(lines, fn(line) =>
+    matchesQuery(line, pattern, caseSensitive)
+  ))
+
+// Search multiple files
+fn searchFiles(
+  files: List[String],
+  query: String,
+  config: Config
+) -> Result[List[(String, List[SearchResult])], String] =
+  let searchFile = fn(filename: String) -> Result[(String, List[SearchResult]), String] =>
+    do content <- readFile(filename);
+    let results = search(content, { config with filename = filename }) in
+    Ok((filename, results))
+  in
+  
+  R.traverse(files, searchFile)
+
+// Display results from multiple files
+fn displayMultiFileResults(
+  results: List[(String, List[SearchResult])],
+  config: Config
+) -> Unit =
+  if config.count_only then
+    let total = L.sum(L.map(results, fn((_, matches)) => L.length(matches))) in
+    println(show(total))
+  else
+    L.foreach(results, fn((filename, matches)) =>
+      if L.length(matches) > 0 then
+        println("\n=== " ++ filename ++ " ===");
+        L.foreach(matches, fn(result) =>
+          println(formatResultWithHighlight(result, config.line_numbers))
+        );
+        ()
+      else
+        ()
+    );
+    ()
+
+// Advanced search with regex-like patterns (simple wildcard support)
+fn matchesPattern(line: String, pattern: String) -> Bool =
+  // Simple wildcard matching: * matches any sequence
+  // This is a simplified version - a real implementation would be more complex
+  
+  if S.contains(pattern, "*") then
+    let parts = S.split(pattern, "*") in
+    let rec checkParts = fn(text: String, patterns: List[String]) -> Bool =>
+      match patterns with
+      | [] -> true
+      | [last] -> S.endsWith(text, last)
+      | part :: rest ->
+          match S.indexOf(text, part) with
+          | None -> false
+          | Some(pos) ->
+              let afterMatch = S.substring(
+                text,
+                pos + S.length(part),
+                S.length(text)
+              ) in
+              checkParts(afterMatch, rest)
+          end
+      end
+    in
+    
+    match parts with
+    | [] -> true
+    | first :: rest ->
+        if S.startsWith(line, first) then
+          let afterFirst = S.substring(line, S.length(first), S.length(line)) in
+          checkParts(afterFirst, rest)
+        else
+          false
+    end
+  else
+    S.contains(line, pattern)
+
+// Context-aware search (show surrounding lines)
+fn searchWithContext(
+  content: String,
+  query: String,
+  config: Config,
+  contextLines: Int
+) -> List[(Int, String, Bool)] =
+  // Returns (line_number, content, is_match)
+  let lines = S.lines(content) in
+  let indexed = L.zipWithIndex(lines) in
+
+  // Find all matching indices
+  let matches = L.filterMap(indexed, fn((line, idx)) =>
+    if matchesQuery(line, query, config.case_sensitive) then
+      Some(idx)
+    else
+      None
+  ) in
+  
+  if L.isEmpty(matches) then
+    []
+  else
+    // A set of all indices we should output (matches + context)
+    // Here we construct a set of indices
+    let rec buildOutputIndices = fn(
+      indices: List[Int],
+      acc: Set[Int]
+    ) -> Set[Int] =>
+      match indices with
+      | [] -> acc
+      | idx :: rest ->
+          // Calculate start and end for context
+          let start = max(0, idx - contextLines) in
+          let end = min(L.length(lines) - 1, idx + contextLines) in
+          
+          let rec addRange = fn(i: Int, currentSet: Set[Int]) -> Set[Int] =>
+            if i > end then
+              currentSet
+            else
+              addRange(i + 1, S.insert(currentSet, i))
+          in
+          
+          let newSet = addRange(start, acc) in
+          buildOutputIndices(rest, newSet)
+      end
+    in
+    
+    let outputSet = buildOutputIndices(matches, S.empty()) in
+    let outputList = S.toList(outputSet) in
+    let sortedList = L.sort(outputList) in
+    
+    // Convert indices back to line info
+    L.map(sortedList, fn(idx) =>
+      let content = match L.get(lines, idx) with
+        | Some(line) -> line
+        | None -> ""
+      end in
+      let isMatch = L.contains(matches, idx) in
+      (idx + 1, content, isMatch)
+    )
+  end
+
+// Highlight match using ansi color codes
+fn ansiHighlight(text: String, start: Int, end: Int) -> String =
+  let red = "\x1b[31;1m" in
+  let reset = "\x1b[0m" in
+  let before = S.substring(text, 0, start) in
+  let matched = S.substring(text, start, end) in
+  let after = S.substring(text, end, S.length(text)) in
+  before ++ red ++ matched ++ reset ++ after
