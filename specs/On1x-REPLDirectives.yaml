@@ -1,0 +1,274 @@
+# On1x REPL Directives Specification
+version: "1.0"
+description: "Complete set of REPL commands for the On1x programming language"
+
+directives:
+  core_inspection:
+    - command: ":type"
+      alias: ":t"
+      args: "<expr>"
+      description: "Show the type of an expression"
+      example: ":type map(f, xs)"
+    
+    - command: ":kind"
+      alias: ":k"
+      args: "<type>"
+      description: "Show the kind of a type"
+      example: ":kind Option"
+    
+    - command: ":info"
+      alias: ":i"
+      args: "<name>"
+      description: "Show detailed information about a binding (type, source, documentation)"
+      example: ":info List.map"
+    
+    - command: ":doc"
+      args: "<name>"
+      description: "Show documentation only"
+      example: ":doc Result"
+    
+    - command: ":source"
+      args: "<name>"
+      description: "Show the source definition"
+      example: ":source bubbleSort"
+
+  module_management:
+    - command: ":load"
+      alias: ":l"
+      args: "<file>"
+      description: "Load and evaluate a file"
+      example: ":load BubbleSort.on1x"
+    
+    - command: ":reload"
+      alias: ":r"
+      args: null
+      description: "Reload the last loaded file"
+      example: ":reload"
+    
+    - command: ":import"
+      args: "<module>"
+      description: "Import a module into the current session"
+      example: ":import Collections.List"
+    
+    - command: ":module"
+      args: "<name>"
+      description: "Switch to or create a module context"
+      example: ":module MyModule"
+    
+    - command: ":modules"
+      args: null
+      description: "List all loaded modules"
+      example: ":modules"
+    
+    - command: ":exports"
+      args: "<module>"
+      description: "Show what a module exports"
+      example: ":exports Collections.Vector"
+
+  environment:
+    - command: ":bindings"
+      alias: ":names"
+      args: null
+      description: "List all names in scope"
+      example: ":bindings"
+    
+    - command: ":locals"
+      args: null
+      description: "Show only local bindings"
+      example: ":locals"
+    
+    - command: ":types"
+      args: null
+      description: "List all type definitions in scope"
+      example: ":types"
+    
+    - command: ":effects"
+      args: null
+      description: "List all effect definitions in scope"
+      example: ":effects"
+    
+    - command: ":clear"
+      args: null
+      description: "Clear all local bindings (reset to prelude)"
+      example: ":clear"
+
+  execution_control:
+    - command: ":trace"
+      args: "<expr>"
+      description: "Evaluate with execution tracing"
+      example: ":trace fibonacci(10)"
+    
+    - command: ":step"
+      args: "<expr>"
+      description: "Step through evaluation"
+      example: ":step quicksort(xs)"
+    
+    - command: ":time"
+      args: "<expr>"
+      description: "Time the evaluation"
+      example: ":time dijkstra(graph, start)"
+    
+    - command: ":optimize"
+      args: "<level>"
+      description: "Set optimization level (0-3)"
+      values: [0, 1, 2, 3]
+      example: ":optimize 2"
+    
+    - command: ":effect-log"
+      args: "<on|off>"
+      description: "Log effect operations"
+      values: ["on", "off"]
+      example: ":effect-log on"
+
+  configuration:
+    - command: ":set"
+      args: "<option> <value>"
+      description: "Set a REPL option"
+      options:
+        - name: "prompt"
+          description: "Change prompt string"
+          example: ":set prompt '>> '"
+        - name: "color"
+          description: "Enable/disable syntax coloring"
+          values: ["on", "off"]
+          example: ":set color on"
+        - name: "multiline"
+          description: "Enable/disable multiline mode"
+          values: ["on", "off"]
+          example: ":set multiline on"
+        - name: "width"
+          description: "Set output width"
+          type: "integer"
+          example: ":set width 120"
+    
+    - command: ":show"
+      args: "<option>"
+      description: "Show current setting"
+      example: ":show prompt"
+    
+    - command: ":config"
+      args: null
+      description: "Show all settings"
+      example: ":config"
+
+  history_and_session:
+    - command: ":history"
+      alias: ":h"
+      args: null
+      description: "Show command history"
+      example: e: ":show prompt"
+    
+    - command: ":config"
+      args: null
+      description: "Show all settings"
+      example: ":config"
+
+  history_and_session:
+    - command: ":history"
+      alias: ":h"
+      args: null
+      description: "Show command history"
+      example: ":history"
+    
+    - command: ":!t"
+      args: "<file>"
+      description: "Execute commands from file"
+      example: ":script init.repl"
+
+  help_and_debugging:
+    - command: ":help"
+      alias: ":?"
+      args: "[directive]"
+      description: "Show directive help or help for specific directive"
+      example: ":help :type"
+    
+    - command: ":browse"
+      args: "<module>"
+      description: "Browse module contents interactively"
+      example: ":browse Collections"
+    
+    - command: ":search"
+      args: "<text>"
+      description: "Search for names containing text"
+      example: ":search sort"
+    
+    - command: ":verbose"
+      args: "<0-3>"
+      description: "Set verbosity level"
+      values: [0, 1, 2, 3]
+      example: ":verbose 2"
+    
+    - command: ":backtrace"
+      alias: ":bt"
+      args: null
+      description: "Show last error backtrace"
+      example: ":backtrace"
+
+  compilation_and_output:
+    - command: ":compile"
+      args: "<file>"
+      description: "Compile file without executing"
+      example: ":compile MyModule.on1x"
+    
+    - command: ":emit"
+      args: "<format> <expr>"
+      description: "Emit compiled output"
+      formats: ["llvm", "asm", "bytecode", "ast"]
+      example: ":emit llvm myFunction"
+    
+    - command: ":check"
+      args: "<file>"
+      description: "Type-check file without loading"
+      example: ":check Sudoku.on1x"
+    
+    - command: ":lint"
+      args: "<file>"
+      description: "Run linter on file"
+      example: ":lint MiniGrep.on1x"
+
+  special:
+    - command: ":quit"
+      alias: ":q"
+      args: null
+      description: "Exit REPL"
+      example: ":quit"
+    
+    - command: ":cd"
+      args: "<dir>"
+      description: "Change working directory"
+      example: ":cd src/"
+    
+    - command: ":pwd"
+      args: null
+      description: "Print working directory"
+      example: ":pwd"
+    
+    - command: ":shell"
+      alias: ":!"
+      args: "<cmd>"
+      description: "Execute shell command"
+      example: ":shell ls -la"
+    
+    - command: ":edit"
+      args: "<file>"
+      description: "Open file in $EDITOR"
+      example: ":edit BubbleSort.on1x"
+
+aliases:
+  ":t": ":type"
+  ":k": ":kind"
+  ":i": ":info"
+  ":l": ":load"
+  ":r": ":reload"
+  ":h": ":history"
+  ":q": ":quit"
+  ":?": ":help"
+  ":bt": ":backtrace"
+  ":!": ":shell"
+
+notes:
+  - "All commands are case-sensitive and must start with a colon (:)"
+  - "Aliases provide shorter forms for frequently used commands"
+  - "Commands can be abbreviated as long as they remain unambiguous"
+  - "Multi-word arguments should be properly quoted or escaped"
+  - "Effect inspection commands are unique to On1x's effect system"
