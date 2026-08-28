@@ -1,18 +1,18 @@
-// BubbleSort.on1x
-// Classic bubble sort implementation in On1x
+-- BubbleSort.on1x
+-- Classic bubble sort implementation in On1x
 
 module BubbleSort where
 
 import std.collections.List
 import std.core.Ordering
 
-// Swap elements at indices i and j in a vector
+-- Swap elements at indices i and j in a vector
 fn swap[T](vec: Vec[T], i: Int, j: Int) -> Vec[T] =
   let vi = Vec.get(vec, i) |> Option.unwrap in
   let vj = Vec.get(vec, j) |> Option.unwrap in
   vec |> Vec.set(i, vj) |> Vec.set(j, vi)
 
-// Single pass of bubble sort - bubbles largest element to the end
+-- Single pass of bubble sort - bubbles largest element to the end
 fn bubblePass[T](vec: Vec[T], n: Int) -> Vec[T] =
   if n <= 1 then
     vec
@@ -28,14 +28,14 @@ fn bubblePass[T](vec: Vec[T], n: Int) -> Vec[T] =
       end
     in vec'
 
-// Bubble sort - repeatedly pass through the vector
+-- Bubble sort - repeatedly pass through the vector
 fn bubbleSort[T](vec: Vec[T]) -> Vec[T] =
   let len = Vec.length(vec) in
   scan i in 0..len with result = vec do
     bubblePass(result, len - i)
   end
 
-// Alternative: bubble sort on lists
+-- Alternative: bubble sort on lists
 fn bubbleSortList[T: Ord](xs: List[T]) -> List[T] =
   let rec bubble = fn(lst: List[T]) -> (Bool, List[T]) =>
     match lst with
@@ -59,7 +59,7 @@ fn bubbleSortList[T: Ord](xs: List[T]) -> List[T] =
   in
   sort(xs)
 
-// Example usage and test
+-- Example usage and test
 fn main() -> Unit =
   let unsorted = Vec.fromList([64, 34, 25, 12, 22, 11, 90]) in
   let sorted = bubbleSort(unsorted) in
@@ -67,7 +67,7 @@ fn main() -> Unit =
   println("Unsorted: " ++ Vec.toString(unsorted));
   println("Sorted:   " ++ Vec.toString(sorted));
   
-  // List version
+  -- List version
   let unsortedList = [5, 2, 8, 1, 9, 3] in
   let sortedList = bubbleSortList(unsortedList) in
   
@@ -76,7 +76,7 @@ fn main() -> Unit =
   
   ()
 
-// Generic comparison-based bubble sort
+-- Generic comparison-based bubble sort
 fn bubbleSortBy[T](vec: Vec[T], compare: (T, T) -> Ordering) -> Vec[T] =
   let len = Vec.length(vec) in
   scan pass in 0..len with result = vec do
@@ -90,7 +90,7 @@ fn bubbleSortBy[T](vec: Vec[T], compare: (T, T) -> Ordering) -> Vec[T] =
     end
   end
 
-// Descending sort
+-- Descending sort
 fn bubbleSortDesc[T: Ord](vec: Vec[T]) -> Vec[T] =
   bubbleSortBy(vec, fn(a, b) => compare(b, a))
 

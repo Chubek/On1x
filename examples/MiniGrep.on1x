@@ -1,5 +1,5 @@
-// MiniGrep.on1x
-// A simple grep-like text search utility in On1x
+-- MiniGrep.on1x
+-- A simple grep-like text search utility in On1x
 
 module MiniGrep where
 
@@ -12,7 +12,7 @@ import std.core.Option as Opt
 import std.core.Result as R
 import std.system.Env as Env
 
-// Configuration for the search
+-- Configuration for the search
 type Config = {
   query: String,
   filename: String,
@@ -22,7 +22,7 @@ type Config = {
   count_only: Bool
 }
 
-// A search result containing the line and its metadata
+-- A search result containing the line and its metadata
 type SearchResult = {
   line_number: Int,
   content: String,
@@ -30,7 +30,7 @@ type SearchResult = {
   match_end: Int
 }
 
-// Parse command-line arguments into a Config
+-- Parse command-line arguments into a Config
 fn parseArgs(args: List[String]) -> Result[Config, String] =
   match args with
   | [] -> Err("Usage: minigrep [OPTIONS] PATTERN FILE")
@@ -85,14 +85,14 @@ fn parseArgs(args: List[String]) -> Result[Config, String] =
       parseOptions(args, defaultConfig)
   end
 
-// Check if a line matches the query
+-- Check if a line matches the query
 fn matchesQuery(line: String, query: String,ower(line) in
   lease_sensitive: Bool) -> Bool =
   let searchLine = if case_sensitive then line else S.toLower(line) in
   let searchQuery = if case_sensitive then query else S.toLower(query) in
   S.contains(searchLine, searchQuery)
 
-// Find the position of the match in a line
+-- Find the position of the match in a line
 fn findMatch(line: String, query: String, case_sensitive: Bool) -> Option[(Int, Int)] =
   let searchLine = if case_sensitive then line else S.toLower(line) in
   let searchQuery = if case_sensitive then query else S.toLower(query) in
@@ -102,7 +102,7 @@ fn findMatch(line: String, query: String, case_sensitive: Bool) -> Option[(Int, 
   | Some(start) -> Some((start, start + S.length(searchQuery)))
   end
 
-// Search a single line
+-- Search a single line
 fn searchLine(
   line: String,
   lineNum: Int,
@@ -115,7 +115,7 @@ fn searchLine(
   if shouldInclude then
     match findMatch(line, query, config.case_sensitive) with
     | None ->
-        // For inverted matches, there's no actual match position
+        -- For inverted matches, there's no actual match position
         Some({
           line_number = lineNum,
           content = line,
@@ -133,7 +133,7 @@ fn searchLine(
   else
     None
 
-// Search all lines in the content
+-- Search all lines in the content
 fn search(content: String, config: Config) -> List[SearchResult] =
   let lines = S.lines(content) in
   let indexed = L.zipWithIndex(lines) in
@@ -142,7 +142,7 @@ fn search(content: String, config: Config) -> List[SearchResult] =
     searchLine(line, idx + 1, config.query, config)
   )
 
-// Format a single search result for display
+-- Format a single search result for display
 fn formatResult(result: SearchResult, showLineNumbers: Bool) -> String =
   let prefix = if showLineNumbers then
     show(result.line_number) ++ ":"
@@ -152,7 +152,7 @@ fn formatResult(result: SearchResult, showLineNumbers: Bool) -> String =
   
   prefix ++ result.content
 
-// Highlight the matched portion (simple version using markers)
+-- Highlight the matched portion (simple version using markers)
 fn formatResultWithHighlight(result: SearchResult, showLineNumbers: Bool) -> String =
   if result.match_start < 0 then
     formatResult(result, showLineNumbers)
@@ -179,7 +179,7 @@ fn formatResultWithHighlight(result: SearchResult, showLineNumbers: Bool) -> Str
       result.match_end
     ) in" ++ after
 
-// Display results
+-- Display results
 fn displayResults(results: List[SearchResult], config: Config) -> Unit =
   if config.count_only then
     println(show(L.length(results)))
@@ -194,12 +194,12 @@ fn displayResults(results: List[SearchResult], config: Config) -> Unit =
     );
     ()
 
-// Read file content
+-- Read file content
 fn readFile(filename: String) -> Result[String, String] =
   match F.readT(e))
   end
 
-// Main search pipeline
+-- Main search pipeline
 fn runSearch(config: Config) -> Result[Unit, String] =
   do content <- readFile(config.filename);
   
@@ -209,7 +209,7 @@ fn runSearch(config: Config) -> Result[Unit, String] =
   
   Ok(())
 
-// Print help message
+-- Print help message
 fn printHelp() -> Unit =
   println("MiniGrep - A simple text search utility");
   println("");
@@ -229,17 +229,17 @@ fn printHelp() -> Unit =
   println("    minigrep -c \"failed\" test_results.txt");
   ()
 
-// Main entry point
+-- Main entry point
 fn main() -> Unit =
   let args = Env.getArgs() in
   
-  // Skip program name (first argument)
+  -- Skip program name (first argument)
   let userArgs = match args with
     | [] -> []
     | _ :: rest -> rest
   end in
   
-  // Check for help flag
+  -- Check for help flag
   if L.any(userArgs, fn(arg) => arg == "-h" || arg == "--help") then
     printHelp()
   else
@@ -258,21 +258,21 @@ fn main() -> Unit =
   
   ()
 
-// Utility function to search within a string (for library use)
+-- Utility function to search within a string (for library use)
 fn grepString(text: String, pattern: String, caseSensitive: Bool) -> List[String] =
   let lines = S.lines(text) in
   L.filter(lines, fn(line) =>
     matchesQuery(line, pattern, caseSensitive)
   )
 
-// Count matches in a string
+-- Count matches in a string
 fn countMatches(text: String, pattern: String, caseSensitive: Bool) -> Int =
   let lines = S.lines(text) in
   L.length(L.filter(lines, fn(line) =>
     matchesQuery(line, pattern, caseSensitive)
   ))
 
-// Search multiple files
+-- Search multiple files
 fn searchFiles(
   files: List[String],
   query: String,
@@ -286,7 +286,7 @@ fn searchFiles(
   
   R.traverse(files, searchFile)
 
-// Display results from multiple files
+-- Display results from multiple files
 fn displayMultiFileResults(
   results: List[(String, List[SearchResult])],
   config: Config
@@ -307,10 +307,10 @@ fn displayMultiFileResults(
     );
     ()
 
-// Advanced search with regex-like patterns (simple wildcard support)
+-- Advanced search with regex-like patterns (simple wildcard support)
 fn matchesPattern(line: String, pattern: String) -> Bool =
-  // Simple wildcard matching: * matches any sequence
-  // This is a simplified version - a real implementation would be more complex
+  -- Simple wildcard matching: * matches any sequence
+  -- This is a simplified version - a real implementation would be more complex
   
   if S.contains(pattern, "*") then
     let parts = S.split(pattern, "*") in
@@ -344,18 +344,18 @@ fn matchesPattern(line: String, pattern: String) -> Bool =
   else
     S.contains(line, pattern)
 
-// Context-aware search (show surrounding lines)
+-- Context-aware search (show surrounding lines)
 fn searchWithContext(
   content: String,
   query: String,
   config: Config,
   contextLines: Int
 ) -> List[(Int, String, Bool)] =
-  // Returns (line_number, content, is_match)
+  -- Returns (line_number, content, is_match)
   let lines = S.lines(content) in
   let indexed = L.zipWithIndex(lines) in
 
-  // Find all matching indices
+  -- Find all matching indices
   let matches = L.filterMap(indexed, fn((line, idx)) =>
     if matchesQuery(line, query, config.case_sensitive) then
       Some(idx)
@@ -366,8 +366,8 @@ fn searchWithContext(
   if L.isEmpty(matches) then
     []
   else
-    // A set of all indices we should output (matches + context)
-    // Here we construct a set of indices
+    -- A set of all indices we should output (matches + context)
+    -- Here we construct a set of indices
     let rec buildOutputIndices = fn(
       indices: List[Int],
       acc: Set[Int]
@@ -375,7 +375,7 @@ fn searchWithContext(
       match indices with
       | [] -> acc
       | idx :: rest ->
-          // Calculate start and end for context
+          -- Calculate start and end for context
           let start = max(0, idx - contextLines) in
           let end = min(L.length(lines) - 1, idx + contextLines) in
           
@@ -395,7 +395,7 @@ fn searchWithContext(
     let outputList = S.toList(outputSet) in
     let sortedList = L.sort(outputList) in
     
-    // Convert indices back to line info
+    -- Convert indices back to line info
     L.map(sortedList, fn(idx) =>
       let content = match L.get(lines, idx) with
         | Some(line) -> line
@@ -406,7 +406,7 @@ fn searchWithContext(
     )
   end
 
-// Highlight match using ansi color codes
+-- Highlight match using ansi color codes
 fn ansiHighlight(text: String, start: Int, end: Int) -> String =
   let red = "\x1b[31;1m" in
   let reset = "\x1b[0m" in
