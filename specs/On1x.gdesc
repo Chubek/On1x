@@ -39,6 +39,7 @@ expression  ::= unary-expression
 	     |  monadic-expression
 	     |  handle-expression
 	     |  primary-expression
+	     |  module-expression
 	     ;
 	     @note   "Monadic expressions simulate statements"
 	     @credit "Scan expressions are due to Paul Kinlt's Summer"
@@ -47,6 +48,11 @@ expression  ::= unary-expression
 definition   ::= type-definition
               |  function-definition
 	      ;
+
+module-expression ::= "module" identifier "where"
+                   |  "import" ["qualified"]  long-identifier ( "," long-identifier )*
+		   |  "import" ["qualified"] long-identifier ( "," long-identifier )* "as" identifier+
+		   ;
 
 primary-expression ::= literal
                     |  identifier
@@ -102,6 +108,10 @@ boolean-literal ::= "true" | "false"
 
 unit-literal ::= "()"
               ;
+
+long-identifier ::= identifier ( "." | "::" identifer)+
+                 ;
+		 @note  "Double colons separate module members, dots sepate record members"
 
 identifier  ::= (letter | "_") (letter | digit | "_")*
              ;
