@@ -1,4 +1,4 @@
-if(NOT TARGET dparser::make_dparser)
+if(NOT TARGET make_dparser)
   add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/dparser ${CMAKE_CURRENT_BINARY_DIR}/third_party/dparser EXCLUDE_FROM_ALL)
 endif()
 
@@ -58,3 +58,7 @@ set_target_properties(on1x_tool PROPERTIES OUTPUT_NAME on1x)
 install(TARGETS on1x_tool
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/egraph/CMakeLists.txt")
+  add_subdirectory(egraph)
+endif()

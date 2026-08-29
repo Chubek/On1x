@@ -40,12 +40,12 @@ endif()
 
 add_subdirectory(src)
 
-if(TARGET on1x_core AND TARGET on1x_vendor)
-  target_link_libraries(on1x_core PUBLIC on1x::vendor)
-endif()
-
 if(TARGET on1x_core)
   target_link_libraries(on1x INTERFACE on1x_core)
+endif()
+
+if(TARGET on1x_egraph)
+  target_link_libraries(on1x INTERFACE on1x_egraph)
 endif()
 
 install(TARGETS on1x on1x_core
