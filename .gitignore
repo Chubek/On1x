@@ -1,3 +1,6 @@
+# dparser
+*.d_parser.c
+
 # Toolchain
 .agents/toolchain
 
