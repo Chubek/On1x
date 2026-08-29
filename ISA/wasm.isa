@@ -1,0 +1,318 @@
+arch wasm32 {
+    word_size = 32;
+    addr_size = 32;
+    endian    = little;
+    align     = 4;
+}
+
+regclass I32 {
+    value(32),
+}
+
+regclass I64 {
+    value(64),
+}
+
+regclass F32 {
+    value(32),
+}
+
+regclass F64 {
+    value(64),
+}
+
+regclass V128 {
+    value(128),
+}
+
+flags WASM {
+    condition
+}
+
+encoding OPCODE {
+    opcode : 8;
+}
+
+encoding OPCODE_U32 {
+    opcode : 8;
+    immediate : 32;
+}
+
+encoding OPCODE_S32 {
+    opcode : 8;
+    immediate : 32;
+}
+
+encoding OPCODE_S64 {
+    opcode : 8;
+    immediate : 64;
+}
+
+encoding OPCODE_U64 {
+    opcode : 8;
+    immediate : 64;
+}
+
+encoding OPCODE_BLOCK {
+    opcode : 8;
+    blocktype : 33;
+}
+
+encoding OPCODE_MEMARG {
+    opcode : 8;
+    align : 32;
+    offset : 32;
+}
+
+encoding OPCODE_BR {
+    opcode : 8;
+    depth : 32;
+}
+
+op UNREACHABLE {
+    opcode = 0;
+    class = control;
+    encoding = OPCODE;
+    syntax = "unreachable";
+    semantics = "trap";
+}
+
+op NOP {
+    opcode = 1;
+    class = control;
+    encoding = OPCODE;
+    syntax = "nop";
+    semantics = "no-op";
+}
+
+op BLOCK {
+    opcode = 2;
+    class = control;
+    encoding = OPCODE_BLOCK;
+    operands = blocktype: imm(33, signed);
+    syntax = "block $blocktype";
+}
+
+op LOOP {
+    opcode = 3;
+    class = control;
+    encoding = OPCODE_BLOCK;
+    operands = blocktype: imm(33, signed);
+    syntax = "loop $blocktype";
+}
+
+op IF {
+    opcode = 4;
+    class = control;
+    encoding = OPCODE_BLOCK;
+    operands = blocktype: imm(33, signed);
+    syntax = "if $blocktype";
+}
+
+op ELSE {
+    opcode = 5;
+    class = control;
+    encoding = OPCODE;
+    syntax = "else";
+}
+
+op END {
+    opcode = 11;
+    class = control;
+    encoding = OPCODE;
+    syntax = "end";
+}
+
+op BR {
+    opcode = 12;
+    class = branch;
+    encoding = OPCODE_BR;
+    operands = depth: imm(32, unsigned);
+    syntax = "br $depth";
+}
+
+op BR_IF {
+    opcode = 13;
+    class = branch;
+    encoding = OPCODE_BR;
+    operands = depth: imm(32, unsigned);
+    syntax = "br_if $depth";
+    flags = condition = test;
+}
+
+op RETURN {
+    opcode = 15;
+    class = branch;
+    encoding = OPCODE;
+    syntax = "return";
+}
+
+op CALL {
+    opcode = 16;
+    class = call;
+    encoding = OPCODE_U32;
+    operands = function: imm(32, unsigned);
+    syntax = "call $function";
+}
+
+op DROP {
+    opcode = 26;
+    class = parametric;
+    encoding = OPCODE;
+    syntax = "drop";
+}
+
+op SELECT {
+    opcode = 27;
+    class = parametric;
+    encoding = OPCODE;
+    syntax = "select";
+}
+
+op LOCAL_GET {
+    opcode = 32;
+    class = variable;
+    encoding = OPCODE_U32;
+    operands = local: imm(32, unsigned);
+    syntax = "local.get $local";
+}
+
+op LOCAL_SET {
+    opcode = 33;
+    class = variable;
+    encoding = OPCODE_U32;
+    operands = local: imm(32, unsigned);
+    syntax = "local.set $local";
+}
+
+op LOCAL_TEE {
+    opcode = 34;
+    class = variable;
+    encoding = OPCODE_U32;
+    operands = local: imm(32, unsigned);
+    syntax = "local.tee $local";
+}
+
+op I32_LOAD {
+    opcode = 40;
+    class = memory;
+    encoding = OPCODE_MEMARG;
+    operands = align: imm(32, unsigned), offset: imm(32, unsigned);
+    syntax = "i32.load $align $offset";
+}
+
+op I32_STORE {
+    opcode = 54;
+    class = memory;
+    encoding = OPCODE_MEMARG;
+    operands = align: imm(32, unsigned), offset: imm(32, unsigned);
+    syntax = "i32.store $align $offset";
+}
+
+op MEMORY_SIZE {
+    opcode = 63;
+    class = memory;
+    encoding = OPCODE;
+    syntax = "memory.size";
+}
+
+op MEMORY_GROW {
+    opcode = 64;
+    class = memory;
+    encoding = OPCODE;
+    syntax = "memory.grow";
+}
+
+op I32_CONST {
+    opcode = 65;
+    class = constant;
+    encoding = OPCODE_S32;
+    operands = immediate: imm(32, signed);
+    syntax = "i32.const $immediate";
+}
+
+op I64_CONST {
+    opcode = 66;
+    class = constant;
+    encoding = OPCODE_S64;
+    operands = immediate: imm(64, signed);
+    syntax = "i64.const $immediate";
+}
+
+op F32_CONST {
+    opcode = 67;
+    class = constant;
+    encoding = OPCODE_U32;
+    operands = immediate: imm(32, unsigned);
+    syntax = "f32.const $immediate";
+}
+
+op F64_CONST {
+    opcode = 68;
+    class = constant;
+    encoding = OPCODE_U64;
+    operands = immediate: imm(64, unsigned);
+    syntax = "f64.const $immediate";
+}
+
+op I32_EQZ {
+    opcode = 69;
+    class = comparison;
+    encoding = OPCODE;
+    syntax = "i32.eqz";
+}
+
+op I32_EQ {
+    opcode = 70;
+    class = comparison;
+    encoding = OPCODE;
+    syntax = "i32.eq";
+}
+
+op I32_ADD {
+    opcode = 106;
+    class = arithmetic;
+    encoding = OPCODE;
+    syntax = "i32.add";
+    semantics = "lhs = lhs + rhs";
+}
+
+op I32_SUB {
+    opcode = 107;
+    class = arithmetic;
+    encoding = OPCODE;
+    syntax = "i32.sub";
+    semantics = "lhs = lhs - rhs";
+}
+
+op I32_MUL {
+    opcode = 108;
+    class = arithmetic;
+    encoding = OPCODE;
+    syntax = "i32.mul";
+    semantics = "lhs = lhs * rhs";
+}
+
+op I64_ADD {
+    opcode = 124;
+    class = arithmetic;
+    encoding = OPCODE;
+    syntax = "i64.add";
+    semantics = "lhs = lhs + rhs";
+}
+
+op F32_ADD {
+    opcode = 146;
+    class = arithmetic;
+    encoding = OPCODE;
+    syntax = "f32.add";
+    semantics = "lhs = lhs + rhs";
+}
+
+op F64_ADD {
+    opcode = 160;
+    class = arithmetic;
+    encoding = OPCODE;
+    syntax = "f64.add";
+    semantics = "lhs = lhs + rhs";
+}
