@@ -1,67 +1,72 @@
 #include "on1x/core/runtime.hpp"
 
-#include <sstream>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <new>
+#include <random>
 #include <stdexcept>
 #include <type_traits>
 
-namespace on1x {
+#include "kmempool.h"
+#include "krng.h"
+#include "kstring.h"
 
-value_ptr make_value(value::node_t node) {
-  auto out = std::make_shared<value>();
-  out->node = std::move(node);
-  return out;
+namespace on1x {
+namespace {
+
+static void *value_pool() {
+  static void *pool = kmp_init(sizeof(value));
+  return pool;
 }
 
-static value_ptr lookup(const std::shared_ptr<env> &scope, const std::string &name) {
-  for (auto cur = scope; cur; cur = cur->parent) {
-    auto it = cur->bindings.find(name);
-    if (it != cur->bindings.end()) return it->second;
+static char *copy_key(env *scope, const std::string &name) {
+  if (!scope || !scope->strings) return nullptr;
+  auto *dst = static_cast<char *>(kba_alloc(scope->strings, static_cast<unsigned>(name.size() + 1), 1));
+  if (!dst) return nullptr;
+  std::memcpy(dst, name.c_str(), name.size() + 1);
+  return dst;
+}
+
+static krng_t &rng() {
+  static krng_t state;
+  static bool seeded = false;
+  if (!seeded) {
+    std::random_device rd;
+    kr_srand_r(&state, (static_cast<uint64_t>(rd()) << 32) ^ rd());
+    seeded = true;
   }
-  return {};
+  return state;
+}
+
+static value_ptr make_pooled_value() {
+  void *mem = kmp_alloc(value_pool());
+  if (!mem) return {};
+  auto *raw = new (mem) value();
+  return value_ptr(raw, [](value *) {});
+}
+
+static value_ptr wrap_value(value *raw) {
+  return value_ptr(raw, [](value *) {});
 }
 
 static std::string join_values(const std::vector<value_ptr> &values, const char *open, const char *close) {
-  std::ostringstream out;
-  out << open;
+  kstring_t out{0, 0, nullptr};
+  kputs(open, &out);
   for (size_t i = 0; i < values.size(); ++i) {
-    if (i) out << ", ";
-    out << to_string(values[i]);
+    if (i) kputs(", ", &out);
+    const std::string item = to_string(values[i]);
+    kputsn(item.data(), static_cast<int>(item.size()), &out);
   }
-  out << close;
-  return out.str();
+  kputs(close, &out);
+  std::string result = out.s ? out.s : "";
+  free(out.s);
+  return result;
 }
 
-std::string to_string(const value_ptr &v) {
-  if (!v) return "None";
-  return std::visit([](const auto &node) -> std::string {
-    using T = std::decay_t<decltype(node)>;
-    if constexpr (std::is_same_v<T, std::monostate>) return "()";
-    if constexpr (std::is_same_v<T, bool>) return node ? "true" : "false";
-    if constexpr (std::is_same_v<T, long long>) return std::to_string(node);
-    if constexpr (std::is_same_v<T, double>) {
-      std::ostringstream out;
-      out << node;
-      return out.str();
-    }
-    if constexpr (std::is_same_v<T, std::string>) return node;
-    if constexpr (std::is_same_v<T, std::vector<value_ptr>>) return join_values(node, "[", "]");
-    if constexpr (std::is_same_v<T, std::map<std::string, value_ptr>>) {
-      std::ostringstream out;
-      out << "{";
-      bool first = true;
-      for (const auto &kv : node) {
-        if (!first) out << ", ";
-        first = false;
-        out << kv.first << ": " << to_string(kv.second);
-      }
-      out << "}";
-      return out.str();
-    }
-    return "<fn>";
-  }, v->node);
+static value_ptr truthy(bool v) {
+  return make_value(v);
 }
-
-static value_ptr truthy(bool v) { return make_value(v); }
 
 static bool as_bool(const value_ptr &v) {
   if (!v) return false;
@@ -73,25 +78,12 @@ static bool as_bool(const value_ptr &v) {
   return true;
 }
 
-static value_ptr eval_block(const block_t &b, const std::shared_ptr<env> &scope, std::string &err) {
-  auto inner = std::make_shared<env>(scope);
-  value_ptr last = make_value(std::monostate{});
-  for (const auto &stmt : b.statements) {
-    last = eval(stmt, inner, err);
-    if (!err.empty()) return {};
-  }
-  if (b.value) {
-    last = eval(b.value, inner, err);
-  }
-  return last;
-}
-
 static value_ptr apply_binary(const std::string &op, const value_ptr &lhs, const value_ptr &rhs, std::string &err) {
   if (!lhs || !rhs) return {};
   if (op == "++") return make_value(to_string(lhs) + to_string(rhs));
   if (op == "&&") return truthy(as_bool(lhs) && as_bool(rhs));
   if (op == "||") return truthy(as_bool(lhs) || as_bool(rhs));
-  if (op == "==" || op == "!=") return truthy(to_string(lhs) == to_string(rhs) ? op == "==" : op == "!=");
+  if (op == "==" || op == "!=") return truthy((to_string(lhs) == to_string(rhs)) == (op == "=="));
   auto li = std::get_if<long long>(&lhs->node);
   auto ri = std::get_if<long long>(&rhs->node);
   auto ld = std::get_if<double>(&lhs->node);
@@ -121,6 +113,124 @@ static value_ptr apply_binary(const std::string &op, const value_ptr &lhs, const
   }
   err = "unsupported binary operator: " + op;
   return {};
+}
+
+static value_ptr random_builtin(const std::vector<value_ptr> &args) {
+  if (args.empty()) return make_value(kr_drand_r(&rng()));
+  auto upper = std::get_if<long long>(&args[0]->node);
+  if (!upper) return make_value(std::monostate{});
+  if (*upper <= 0) return make_value(static_cast<long long>(0));
+  return make_value(static_cast<long long>(kr_drand_r(&rng()) * static_cast<double>(*upper)));
+}
+
+static value_ptr randint_builtin(const std::vector<value_ptr> &args) {
+  long long lo = 0;
+  long long hi = 0;
+  if (args.size() == 1) {
+    auto upper = std::get_if<long long>(&args[0]->node);
+    if (!upper || *upper <= 0) return make_value(static_cast<long long>(0));
+    hi = *upper;
+  } else if (args.size() >= 2) {
+    auto a = std::get_if<long long>(&args[0]->node);
+    auto b = std::get_if<long long>(&args[1]->node);
+    if (!a || !b || *b < *a) return make_value(static_cast<long long>(0));
+    lo = *a;
+    hi = *b + 1;
+  } else {
+    return make_value(static_cast<long long>(0));
+  }
+  const double r = kr_drand_r(&rng());
+  return make_value(lo + static_cast<long long>(r * static_cast<double>(hi - lo)));
+}
+
+}  // namespace
+
+env::env(std::shared_ptr<env> p) : parent(std::move(p)), bindings(kh_init(on1x_binding)), strings(kba_init(65536)) {}
+
+env::~env() {
+  if (bindings) {
+    kh_destroy(on1x_binding, bindings);
+    bindings = nullptr;
+  }
+  if (strings) {
+    kba_destroy(strings);
+    strings = nullptr;
+  }
+}
+
+value_ptr make_value(value::node_t node) {
+  auto out = make_pooled_value();
+  if (!out) return {};
+  out->node = std::move(node);
+  return out;
+}
+
+value_ptr lookup(const std::shared_ptr<env> &scope, const std::string &name) {
+  for (auto cur = scope; cur; cur = cur->parent) {
+    if (!cur->bindings) continue;
+    const khiter_t k = kh_get(on1x_binding, cur->bindings, name.c_str());
+    if (k != kh_end(cur->bindings)) return wrap_value(kh_val(cur->bindings, k));
+  }
+  return {};
+}
+
+bool bind(const std::shared_ptr<env> &scope, const std::string &name, value_ptr value) {
+  if (!scope || !scope->bindings) return false;
+  int ret = 0;
+  const khiter_t k = kh_put(on1x_binding, scope->bindings, name.c_str(), &ret);
+  if (ret < 0) return false;
+  if (ret != 0) {
+    char *key = copy_key(scope.get(), name);
+    if (!key) {
+      kh_del(on1x_binding, scope->bindings, k);
+      return false;
+    }
+    kh_key(scope->bindings, k) = key;
+  }
+  kh_val(scope->bindings, k) = value.get();
+  return true;
+}
+
+std::string to_string(const value_ptr &v) {
+  if (!v) return "None";
+  return std::visit([](const auto &node) -> std::string {
+    using T = std::decay_t<decltype(node)>;
+    if constexpr (std::is_same_v<T, std::monostate>) return "()";
+    if constexpr (std::is_same_v<T, bool>) return node ? "true" : "false";
+    if constexpr (std::is_same_v<T, long long>) return std::to_string(node);
+    if constexpr (std::is_same_v<T, double>) return std::to_string(node);
+    if constexpr (std::is_same_v<T, std::string>) return node;
+    if constexpr (std::is_same_v<T, std::vector<value_ptr>>) return join_values(node, "[", "]");
+    if constexpr (std::is_same_v<T, std::map<std::string, value_ptr>>) {
+      kstring_t out{0, 0, nullptr};
+      kputc('{', &out);
+      bool first = true;
+      for (const auto &kv : node) {
+        if (!first) kputs(", ", &out);
+        first = false;
+        kputsn(kv.first.data(), static_cast<int>(kv.first.size()), &out);
+        kputs(": ", &out);
+        const std::string value = to_string(kv.second);
+        kputsn(value.data(), static_cast<int>(value.size()), &out);
+      }
+      kputc('}', &out);
+      std::string result = out.s ? out.s : "";
+      free(out.s);
+      return result;
+    }
+    return "<fn>";
+  }, v->node);
+}
+
+static value_ptr eval_block(const block_t &b, const std::shared_ptr<env> &scope, std::string &err) {
+  auto inner = std::make_shared<env>(scope);
+  value_ptr last = make_value(std::monostate{});
+  for (const auto &stmt : b.statements) {
+    last = eval(stmt, inner, err);
+    if (!err.empty()) return {};
+  }
+  if (b.value) last = eval(b.value, inner, err);
+  return last;
 }
 
 value_ptr eval(const expr_ptr &e, const std::shared_ptr<env> &scope, std::string &err) {
@@ -153,7 +263,10 @@ value_ptr eval(const expr_ptr &e, const std::shared_ptr<env> &scope, std::string
         auto rhs = eval(node.rhs, scope, err);
         if (!err.empty()) return {};
         if (auto id = std::get_if<ident_t>(&node.lhs->node)) {
-          const_cast<std::shared_ptr<env>&>(scope)->bindings[id->value] = rhs;
+          if (!on1x::bind(scope, id->value, rhs)) {
+            err = "failed to bind name: " + id->value;
+            return {};
+          }
           return rhs;
         }
         err = "left side of assignment must be an identifier";
@@ -201,7 +314,10 @@ value_ptr eval(const expr_ptr &e, const std::shared_ptr<env> &scope, std::string
       auto val = eval(node.value, scope, err);
       if (!err.empty()) return {};
       auto inner = std::make_shared<env>(scope);
-      inner->bindings[node.name] = val;
+      if (!on1x::bind(inner, node.name, val)) {
+        err = "failed to bind name: " + node.name;
+        return {};
+      }
       return eval(node.body, inner, err);
     }
     if constexpr (std::is_same_v<T, block_t>) return eval_block(node, scope, err);
@@ -235,7 +351,10 @@ value_ptr eval(const expr_ptr &e, const std::shared_ptr<env> &scope, std::string
       auto body = node.body;
       return make_value(native_fn([closure, params, body](const std::vector<value_ptr> &args) -> value_ptr {
         auto local = std::make_shared<env>(closure);
-        for (size_t i = 0; i < params.size(); ++i) local->bindings[params[i]] = i < args.size() ? args[i] : make_value(std::monostate{});
+        for (size_t i = 0; i < params.size(); ++i) {
+          auto arg = i < args.size() ? args[i] : make_value(std::monostate{});
+          if (!on1x::bind(local, params[i], arg)) return make_value(std::string("failed to bind parameter"));
+        }
         std::string err;
         auto out = eval(body, local, err);
         return err.empty() ? out : make_value(std::string(err));
@@ -247,27 +366,33 @@ value_ptr eval(const expr_ptr &e, const std::shared_ptr<env> &scope, std::string
 
 std::shared_ptr<env> make_prelude(std::ostream *sink) {
   auto scope = std::make_shared<env>();
-  scope->bindings["print"] = make_value(native_fn([sink](const std::vector<value_ptr> &args) -> value_ptr {
+  on1x::bind(scope, "print", make_value(native_fn([sink](const std::vector<value_ptr> &args) -> value_ptr {
     if (sink && !args.empty()) (*sink) << to_string(args[0]);
     return make_value(std::monostate{});
-  }));
-  scope->bindings["println"] = make_value(native_fn([sink](const std::vector<value_ptr> &args) -> value_ptr {
+  })));
+  on1x::bind(scope, "println", make_value(native_fn([sink](const std::vector<value_ptr> &args) -> value_ptr {
     if (sink) {
       if (!args.empty()) (*sink) << to_string(args[0]);
       (*sink) << '\n';
     }
     return make_value(std::monostate{});
-  }));
-  scope->bindings["show"] = make_value(native_fn([](const std::vector<value_ptr> &args) -> value_ptr {
+  })));
+  on1x::bind(scope, "show", make_value(native_fn([](const std::vector<value_ptr> &args) -> value_ptr {
     return make_value(args.empty() ? std::string() : to_string(args[0]));
-  }));
-  scope->bindings["panic"] = make_value(native_fn([](const std::vector<value_ptr> &args) -> value_ptr {
+  })));
+  on1x::bind(scope, "panic", make_value(native_fn([](const std::vector<value_ptr> &args) -> value_ptr {
     throw std::runtime_error(args.empty() ? "panic" : to_string(args[0]));
-  }));
-  scope->bindings["assert"] = make_value(native_fn([](const std::vector<value_ptr> &args) -> value_ptr {
+  })));
+  on1x::bind(scope, "assert", make_value(native_fn([](const std::vector<value_ptr> &args) -> value_ptr {
     if (args.size() >= 2 && !as_bool(args[0])) throw std::runtime_error(to_string(args[1]));
     return make_value(std::monostate{});
-  }));
+  })));
+  on1x::bind(scope, "random", make_value(native_fn([](const std::vector<value_ptr> &args) -> value_ptr {
+    return random_builtin(args);
+  })));
+  on1x::bind(scope, "randint", make_value(native_fn([](const std::vector<value_ptr> &args) -> value_ptr {
+    return randint_builtin(args);
+  })));
   return scope;
 }
 

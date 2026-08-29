@@ -25,7 +25,6 @@ add_library(on1x INTERFACE)
 add_library(on1x::on1x ALIAS on1x)
 
 add_subdirectory(include)
-add_subdirectory(src)
 
 if(ON1X_ENABLE_TOOLCHAIN AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/CMakeLists.txt")
   add_subdirectory(toolchain)
@@ -38,6 +37,8 @@ endif()
 if(ON1X_ENABLE_THIRD_PARTY AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/CMakeLists.txt")
   add_subdirectory(third_party)
 endif()
+
+add_subdirectory(src)
 
 if(TARGET on1x_core AND TARGET on1x_vendor)
   target_link_libraries(on1x_core PUBLIC on1x::vendor)

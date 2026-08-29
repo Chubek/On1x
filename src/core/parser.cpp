@@ -1,12 +1,39 @@
 #include "on1x/core/parser.hpp"
 
+#include "dparse.h"
+
 #include <cctype>
 #include <cstdlib>
 #include <stdexcept>
 #include <string_view>
 
+extern "C" D_ParserTables parser_tables_gram;
+extern "C" D_ParseNode *ambiguity_count_fn(D_Parser *pp, int n, D_ParseNode **v);
+
 namespace on1x {
 namespace {
+
+static bool validate_with_dparser(const std::string &source, std::string &error) {
+  D_Parser *parser = new_D_Parser(&parser_tables_gram, sizeof(D_ParseNode_User));
+  if (!parser) {
+    error = "failed to initialize dparser";
+    return false;
+  }
+
+  parser->save_parse_tree = 1;
+  parser->ambiguity_fn = ambiguity_count_fn;
+  std::string mutable_source = source;
+  D_ParseNode *tree = dparse(parser, mutable_source.data(), static_cast<int>(mutable_source.size()));
+  if (!tree || parser->syntax_errors) {
+    error = "syntax error";
+    free_D_Parser(parser);
+    return false;
+  }
+
+  free_D_ParseNode(parser, tree);
+  free_D_Parser(parser);
+  return true;
+}
 
 enum class kind {
   eof,
@@ -247,11 +274,13 @@ class parser {
       }
       auto body = parse_function_body(error);
       if (!error.empty()) return {};
-      return make_expr(binary_t{
+      auto definition = make_expr(binary_t{
           "=",
           make_expr(ident_t{name}),
           make_expr(lambda_t{std::move(params), body}),
       });
+      match(kind::semicolon);
+      return definition;
     }
     auto expr = parse_sequence(error);
     if (!error.empty()) return {};
@@ -676,6 +705,8 @@ class parser {
 }  // namespace
 
 program parse_program(const std::string &source, std::string &error) {
+  if (!validate_with_dparser(source, error)) return {};
+  error.clear();
   lexer lex(source);
   auto tokens = lex.lex(error);
   if (!error.empty()) return {};

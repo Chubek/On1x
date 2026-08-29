@@ -9,7 +9,15 @@
 #include <memory>
 #include <ostream>
 #include <string>
-#include <unordered_map>
+
+#include "kbarena.h"
+#include "khash.h"
+
+namespace on1x {
+struct value;
+}
+
+KHASH_MAP_INIT_STR(on1x_binding, on1x::value *)
 
 namespace on1x {
 
@@ -26,14 +34,18 @@ struct value {
 
 struct env {
   std::shared_ptr<env> parent;
-  std::unordered_map<std::string, value_ptr> bindings;
-  explicit env(std::shared_ptr<env> p = {}) : parent(std::move(p)) {}
+  khash_t(on1x_binding) *bindings;
+  void *strings;
+  explicit env(std::shared_ptr<env> p = {});
+  ~env();
 };
 
 value_ptr make_value(value::node_t node);
 std::string to_string(const value_ptr &v);
 value_ptr eval(const expr_ptr &e, const std::shared_ptr<env> &scope, std::string &err);
 std::shared_ptr<env> make_prelude(std::ostream *sink = nullptr);
+value_ptr lookup(const std::shared_ptr<env> &scope, const std::string &name);
+bool bind(const std::shared_ptr<env> &scope, const std::string &name, value_ptr value);
 
 }  // namespace on1x
 
