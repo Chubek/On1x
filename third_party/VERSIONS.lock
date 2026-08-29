@@ -1,0 +1,33 @@
+format: 1
+dependencies:
+  - name: klib
+    version: snapshot
+    commit: 97a0fcb790b43b9e5da8994f4671021fec036f19
+    source: third_party/klib
+  - name: mpc
+    version: 0.9.0
+    source: third_party/mpc
+  - name: qbe
+    version: snapshot
+    source: third_party/qbe
+  - name: dparser
+    version: 1.30.0.0
+    source: third_party/dparser
+  - name: dynalo
+    version: 1.0.3
+    source: third_party/dynalo
+  - name: dyncall
+    version: snapshot
+    source: third_party/dyncall
+  - name: equinox-ng
+    version: snapshot
+    source: third_party/equinox-ng
+  - name: keystone
+    version: 0.9.2
+    source: third_party/keystone
+  - name: libgc
+    version: 8.2.10
+    source: third_party/libgc
+  - name: replxx
+    version: 0.0.4
+    source: third_party/replxx
