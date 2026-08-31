@@ -6,3 +6,4 @@ canonical error categories.
 
 - `(/ x 0) => sema_error_div_zero`
 - `(% x 0) => sema_error_mod_zero`
+- `common-semantic-errors.rwr` adds broader diagnostic shapes for the semantic checker.

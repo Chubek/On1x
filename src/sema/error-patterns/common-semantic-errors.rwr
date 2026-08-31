@@ -1,0 +1,44 @@
+(ident x) => sema_error_undefined_var
+(- x) => sema_error_bad_unary_minus
+(! x) => sema_error_bad_unary_not
+(~ x) => sema_error_bad_unary_bitnot
+(* x) => sema_error_bad_unary_deref
+(& x) => sema_error_bad_unary_ref
+(+ x y) => sema_error_bad_binary_add
+(- x y) => sema_error_bad_binary_sub
+(* x y) => sema_error_bad_binary_mul
+(/ x y) => sema_error_bad_binary_div
+(% x y) => sema_error_bad_binary_mod
+(** x y) => sema_error_bad_binary_pow
+(== x y) => sema_error_bad_binary_eq
+(!= x y) => sema_error_bad_binary_neq
+(< x y) => sema_error_bad_binary_lt
+(<= x y) => sema_error_bad_binary_lte
+(> x y) => sema_error_bad_binary_gt
+(>= x y) => sema_error_bad_binary_gte
+(&& x y) => sema_error_bad_binary_and
+(|| x y) => sema_error_bad_binary_or
+(& x y) => sema_error_bad_binary_bitand
+(| x y) => sema_error_bad_binary_bitor
+(^ x y) => sema_error_bad_binary_bitxor
+(<< x y) => sema_error_bad_binary_shl
+(>> x y) => sema_error_bad_binary_shr
+(= x y) => sema_error_bad_assign
+(+= x y) => sema_error_bad_assign_add
+(-= x y) => sema_error_bad_assign_sub
+(*= x y) => sema_error_bad_assign_mul
+(/= x y) => sema_error_bad_assign_div
+(%= x y) => sema_error_bad_assign_mod
+(&= x y) => sema_error_bad_assign_bitand
+(|= x y) => sema_error_bad_assign_bitor
+(^= x y) => sema_error_bad_assign_bitxor
+(<<= x y) => sema_error_bad_assign_shl
+(>>= x y) => sema_error_bad_assign_shr
+(if x y z) => sema_error_bad_if
+(let x y z) => sema_error_bad_let
+(block x y) => sema_error_bad_block
+(list x y) => sema_error_bad_list
+(tuple x y) => sema_error_bad_tuple
+(record x y) => sema_error_bad_record
+(lambda x y) => sema_error_bad_lambda
+(call x y) => sema_error_bad_call
