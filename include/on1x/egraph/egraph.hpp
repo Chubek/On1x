@@ -1,7 +1,7 @@
 #ifndef ON1X_EGRAPH_EGRAPH_HPP
 #define ON1X_EGRAPH_EGRAPH_HPP
 
-#include "on1x/core/ast.hpp"
+#include "on1x/frontend/ast.hpp"
 
 #include <cstddef>
 #include <string>

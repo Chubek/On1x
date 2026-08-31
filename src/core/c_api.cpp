@@ -1,8 +1,8 @@
 #include "On1x.h"
 
 #include "on1x/memory/memory.hpp"
-#include "on1x/core/parser.hpp"
 #include "on1x/core/runtime.hpp"
+#include "on1x/frontend/parser.hpp"
 
 #include <cstdlib>
 #include <cstring>

@@ -44,6 +44,10 @@ if(TARGET on1x_core)
   target_link_libraries(on1x INTERFACE on1x_core)
 endif()
 
+if(TARGET on1x_frontend)
+  target_link_libraries(on1x INTERFACE on1x_frontend)
+endif()
+
 if(TARGET on1x_memory)
   target_link_libraries(on1x INTERFACE $<BUILD_INTERFACE:on1x_memory>)
 endif()
@@ -72,7 +76,7 @@ if(TARGET on1x_egraph)
   target_link_libraries(on1x INTERFACE on1x_egraph)
 endif()
 
- install(TARGETS on1x on1x_core
+ install(TARGETS on1x on1x_core on1x_frontend
    EXPORT On1xTargets
  )
 

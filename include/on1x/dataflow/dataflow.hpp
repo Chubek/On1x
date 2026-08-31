@@ -1,7 +1,7 @@
 #ifndef ON1X_DATAFLOW_DATAFLOW_HPP
 #define ON1X_DATAFLOW_DATAFLOW_HPP
 
-#include "on1x/core/ast.hpp"
+#include "on1x/frontend/ast.hpp"
 #include "on1x/sema/sema.hpp"
 
 #include <cstddef>

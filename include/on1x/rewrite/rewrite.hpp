@@ -1,8 +1,8 @@
 #ifndef ON1X_REWRITE_REWRITE_HPP
 #define ON1X_REWRITE_REWRITE_HPP
 
-#include "on1x/core/ast.hpp"
-#include "on1x/core/parser.hpp"
+#include "on1x/frontend/ast.hpp"
+#include "on1x/frontend/parser.hpp"
 
 #include <functional>
 #include <map>
