@@ -48,6 +48,10 @@ if(TARGET on1x_memory)
   target_link_libraries(on1x INTERFACE $<BUILD_INTERFACE:on1x_memory>)
 endif()
 
+if(TARGET on1x_codegen)
+  target_link_libraries(on1x INTERFACE on1x_codegen)
+endif()
+
 if(TARGET on1x_plugin)
   target_link_libraries(on1x INTERFACE on1x_plugin)
 endif()

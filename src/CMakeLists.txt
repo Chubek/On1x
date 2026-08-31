@@ -56,6 +56,10 @@ if(TARGET on1x_memory)
   target_link_libraries(on1x_core PRIVATE $<BUILD_INTERFACE:on1x_memory>)
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/codegen/CMakeLists.txt")
+  add_subdirectory(codegen)
+endif()
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/plugin/CMakeLists.txt")
   add_subdirectory(plugin)
 endif()
