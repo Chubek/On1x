@@ -52,6 +52,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/memory/CMakeLists.txt")
   add_subdirectory(memory)
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ffi/CMakeLists.txt")
+  add_subdirectory(ffi)
+endif()
+
 if(TARGET on1x_memory)
   target_link_libraries(on1x_core PRIVATE $<BUILD_INTERFACE:on1x_memory>)
 endif()
