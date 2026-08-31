@@ -1,0 +1,225 @@
+# On1x CLI Arguments Specification
+
+on1x-cli:
+  metadata:
+    name: "on1x"
+    version: "0.1.0"
+    description: "On1x programming language compiler and runtime"
+    usage: "on1x [OPTIONS] [FILE]"
+
+  arguments:
+    - long: "--interactive"
+      short: "-i"
+      type: "flag"
+      values: []
+      default: null
+      alternative: null
+      action: "Launches interactive REPL mode"
+      description: "Start an interactive Read-Eval-Print Loop session for On1x"
+      observation: "On1x launches into REPL automatically if no arguments or file are provided"
+      conflicts_with: ["FILE"]
+      requires: []
+      
+    - long: "--mode"
+      short: "-m"
+      type: "option"
+      values: ["jit", "aot", "vm", "cc"]
+      default: "vm"
+      alternative: null
+      action: "Selects the execution/compilation backend"
+      description: |
+        Choose how On1x executes or compiles code:
+        - jit: Just-In-Time compilation (implies VM execution)
+        - aot: Ahead-Of-Time compilation to bytecode
+        - vm: Virtual machine interpreter (default)
+        - cc: Compile to native code via QBE backend
+      observation: "JIT mode requires VM; CC mode uses QBE as the code generation backend"
+      conflicts_with: []
+      requires: []
+      validation:
+        required: false
+        case_sensitive: false
+        
+    - long: "--target"
+      short: "-T"
+      type: "option"
+      values: ["x86_64", "aarch64", "wasm"]
+      default: null
+      alternative: null
+      action: "Specifies target architecture for compilation"
+      description: "Target architecture when using AOT or CC modes"
+      observation: "Only applies when --mode is 'aot' or 'cc'; ignored for VM and JIT modes"
+      conflicts_with: []
+      requires: ["--mode"]
+      validation:
+        required: false
+        requires_value: ["aot", "cc"]
+        
+    - long: "--optimize"
+      short: "-O"
+      type: "option"
+      values: ["0", "1", "2", "3"]
+      default: "0"
+      alternative: null
+      action: "Sets optimization level"
+      description: |
+        Optimization level for compilation:
+        - 0: No optimization (fastest compile)
+        - 1: Basic optimization
+        - 2: Moderate optimization (recommended)
+        - 3: Aggressive optimization (slowest compile)
+      observation: "Higher levels increase compile time but improve runtime performance"
+      conflicts_with: []
+      requires: []
+      
+    - long: "--output"
+      short: "-o"
+      type: "option"
+      values: ["<path>"]
+      default: null
+      alternative: null
+      action: "Specifies output file path"
+      description: "Path for compiled output; defaults to 'a.out' for CC mode, bytecode file for AOT"
+      observation: "Only meaningful for AOT and CC compilation modes"
+      conflicts_with: ["--interactive"]
+      requires: []
+      validation:
+        required: false
+        
+    - long: "--verbose"
+      short: "-v"
+      type: "flag"
+      values: []
+      default: null
+      alternative: null
+      action: "Enables verbose output"
+      description: "Display detailed compilation and execution information"
+      observation: "Can be repeated for increased verbosity (-vv, -vvv)"
+      conflicts_with: []
+      requires: []
+      
+    - long: "--debug"
+      short: "-d"
+      type: "flag"
+      values: []
+      default: null
+      alternative: null
+      action: "Enables debug mode"
+      description: "Generate debug symbols and enable debugging features"
+      observation: "Disables some optimizations even if -O is specified"
+      conflicts_with: []
+      requires: []
+      
+    - long: "--help"
+      short: "-h"
+      type: "flag"
+      values: []
+      default: null
+      alternative: null
+      action: "Displays help message and exits"
+      description: "Show usage information and available options"
+      observation: "Exits immediately after displaying help"
+      conflicts_with: []
+      requires: []
+      
+    - long: "--version"
+      short: "-V"
+      type: "flag"
+      values: []
+      default: null
+      alternative: null
+      action: "Displays version information and exits"
+      description: "Show On1x version and build information"
+      observation: "Exits immediately after displaying version"
+      conflicts_with: []
+      requires: []
+
+  positional:
+    - name: "FILE"
+      type: "path"
+      required: false
+      description: "On1x source file to execute or compile"
+      observation: "If omitted and no --interactive flag, enters REPL mode"
+      validation:
+        must_exist: true
+        extensions: [".on1x", ".onx"]
+
+  execution_modes:
+    - name: "REPL"
+      triggered_by: ["--interactive", "no arguments"]
+      backend: "vm"
+      description: "Interactive mode for exploring On1x"
+      
+    - name: "Script Execution"
+      triggered_by: ["FILE provided", "--mode vm|jit"]
+      backend: ["vm", "jit"]
+      description: "Execute source file directly"
+      
+    - name: "Compilation"
+      triggered_by: ["FILE provided", "--mode aot|cc"]
+      backend: ["aot", "cc"]
+      description: "Compile source to bytecode or native code"
+
+  backend_details:
+    vm:
+      name: "Virtual Machine"
+      description: "Bytecode interpreter with reasonable performance"
+      output: "none (direct execution)"
+      startup: "fast"
+      runtime: "moderate"
+      
+    jit:
+      name: "Just-In-Time Compiler"
+      description: "Dynamic compilation with VM fallback"
+      output: "none (direct execution)"
+      startup: "moderate"
+      runtime: "fast"
+      requires: "vm"
+      
+    aot:
+      name: "Ahead-Of-Time Compiler"
+      description: "Compile to On1x bytecode format"
+      output: "bytecode file (.onxc)"
+      startup: "n/a"
+      runtime: "moderate (when executed)"
+      
+    cc:
+      name: "C Compiler Backend"
+      description: "Native code compilation via QBE intermediate representation"
+      output: "native executable"
+      startup: "n/a"
+      runtime: "fast"
+      backend_tool: "QBE"
+
+  validation_rules:
+    - rule: "If --mode is 'cc' or 'aot', FILE must be provided"
+      error: "Compilation modes require a source file"
+      
+    - rule: "If --interactive is set, FILE must not be provided"
+      error: "Cannot specify both interactive mode and a source file"
+      
+    - rule: "If --output is specified, --mode must be 'cc' or 'aot'"
+      error: "Output path only applies to compilation modes"
+      
+    - rule: "If --target is specified, --mode must be 'cc' or 'aot'"
+      error: "Target architecture only applies to compilation modes"
+
+  examples:
+    - command: "on1x"
+      description: "Launch REPL mode"
+      
+    - command: "on1x script.on1x"
+      description: "Execute script in VM mode (default)"
+      
+    - command: "on1x -m jit script.on1x"
+      description: "Execute with JIT compilation"
+      
+    - command: "on1x -m cc -O2 -o program script.on1x"
+      description: "Compile to native executable with optimization"
+      
+    - command: "on1x -m aot -T wasm script.on1x"
+      description: "Compile to WebAssembly target"
+      
+    - command: "on1x -i"
+      description: "Explicit REPL launch"
+
