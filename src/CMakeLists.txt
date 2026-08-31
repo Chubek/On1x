@@ -22,8 +22,6 @@ add_library(on1x_core STATIC
   core/eval.cpp
   core/parser.cpp
   core/runtime.cpp
-  ../third_party/klib/kbarena.c
-  ../third_party/klib/kmempool.c
   ../third_party/klib/kstring.c
   ${ON1X_GENERATED_DIR}/On1x.g.d_parser.c
 )
@@ -48,6 +46,14 @@ if(MSVC)
   target_compile_options(on1x_core PRIVATE /W4)
 else()
   target_compile_options(on1x_core PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/memory/CMakeLists.txt")
+  add_subdirectory(memory)
+endif()
+
+if(TARGET on1x_memory)
+  target_link_libraries(on1x_core PRIVATE $<BUILD_INTERFACE:on1x_memory>)
 endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/plugin/CMakeLists.txt")

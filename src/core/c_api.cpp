@@ -1,5 +1,6 @@
 #include "On1x.h"
 
+#include "on1x/memory/memory.hpp"
 #include "on1x/core/parser.hpp"
 #include "on1x/core/runtime.hpp"
 
@@ -79,6 +80,7 @@ static void reset_vm(on1x_vm *vm) {
 extern "C" {
 
 on1x_vm *on1x_vm_create(void) {
+  on1x::memory::initialize();
   auto *vm = new on1x_vm();
   reset_vm(vm);
   on1x::bind(vm->scope, "print", on1x::make_value(on1x::native_fn([vm](const std::vector<on1x::value_ptr> &args) -> on1x::value_ptr {

@@ -7,6 +7,7 @@
 #include "on1x/core/runtime.hpp"
 #include "on1x/dataflow/dataflow.hpp"
 #include "on1x/egraph/egraph.hpp"
+#include "on1x/memory/memory.hpp"
 #include "on1x/plugin/plugin.hpp"
 #include "on1x/rewrite/rewrite.hpp"
 #include "on1x/sema/sema.hpp"
