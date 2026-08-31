@@ -30,6 +30,7 @@ static on1x_status evaluate_source(on1x_vm *vm, const std::string &source, std::
   std::string error;
   auto program = on1x::parse_program(source, error);
   if (!error.empty()) {
+    output = error;
     return ON1X_PARSE_ERROR;
   }
 
@@ -67,13 +68,19 @@ static on1x_status evaluate_source(on1x_vm *vm, const std::string &source, std::
   return ON1X_OK;
 }
 
+static void reset_vm(on1x_vm *vm) {
+  if (!vm) return;
+  vm->scope = on1x::make_prelude(nullptr);
+  vm->sink = nullptr;
+}
+
 }  // namespace
 
 extern "C" {
 
 on1x_vm *on1x_vm_create(void) {
   auto *vm = new on1x_vm();
-  vm->scope = on1x::make_prelude(nullptr);
+  reset_vm(vm);
   on1x::bind(vm->scope, "print", on1x::make_value(on1x::native_fn([vm](const std::vector<on1x::value_ptr> &args) -> on1x::value_ptr {
     if (vm->sink && !args.empty()) (*vm->sink) << on1x::to_string(args[0]);
     return on1x::make_value(std::monostate{});
@@ -90,6 +97,10 @@ on1x_vm *on1x_vm_create(void) {
 
 void on1x_vm_destroy(on1x_vm *vm) {
   delete vm;
+}
+
+void on1x_vm_reset(on1x_vm *vm) {
+  reset_vm(vm);
 }
 
 on1x_status on1x_vm_eval_string(on1x_vm *vm, const char *source, char **output) {
@@ -125,6 +136,16 @@ on1x_status on1x_vm_eval_file(on1x_vm *vm, const char *path, char **output) {
     if (!*output) return ON1X_RUNTIME_ERROR;
   }
   return ON1X_OK;
+}
+
+const char *on1x_status_string(on1x_status status) {
+  switch (status) {
+    case ON1X_OK: return "ok";
+    case ON1X_PARSE_ERROR: return "parse error";
+    case ON1X_RUNTIME_ERROR: return "runtime error";
+    case ON1X_IO_ERROR: return "io error";
+  }
+  return "unknown";
 }
 
 void on1x_string_free(char *text) {

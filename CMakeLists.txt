@@ -44,21 +44,25 @@ if(TARGET on1x_core)
   target_link_libraries(on1x INTERFACE on1x_core)
 endif()
 
- if(TARGET on1x_rewrite)
-   target_link_libraries(on1x INTERFACE on1x_rewrite)
- endif()
- 
- if(TARGET on1x_dataflow)
-   target_link_libraries(on1x INTERFACE on1x_dataflow)
- endif()
- 
- if(TARGET on1x_sema)
-   target_link_libraries(on1x INTERFACE on1x_sema)
- endif()
- 
- if(TARGET on1x_egraph)
-   target_link_libraries(on1x INTERFACE on1x_egraph)
- endif()
+if(TARGET on1x_plugin)
+  target_link_libraries(on1x INTERFACE on1x_plugin)
+endif()
+
+if(TARGET on1x_rewrite)
+  target_link_libraries(on1x INTERFACE on1x_rewrite)
+endif()
+
+if(TARGET on1x_dataflow)
+  target_link_libraries(on1x INTERFACE on1x_dataflow)
+endif()
+
+if(TARGET on1x_sema)
+  target_link_libraries(on1x INTERFACE on1x_sema)
+endif()
+
+if(TARGET on1x_egraph)
+  target_link_libraries(on1x INTERFACE on1x_egraph)
+endif()
 
  install(TARGETS on1x on1x_core
    EXPORT On1xTargets

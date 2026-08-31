@@ -1,8 +1,8 @@
 #ifndef ON1X_SEMA_SEMA_HPP
 #define ON1X_SEMA_SEMA_HPP
 
- #include "on1x/core/ast.hpp"
- #include "on1x/core/parser.hpp"
+#include "on1x/core/ast.hpp"
+#include "on1x/core/parser.hpp"
 
 #include <cstddef>
 #include <map>
@@ -16,7 +16,7 @@
 namespace on1x::sema {
 
 // ---------------------------------------------------------------------------
-//  Type representation — concrete types must be defined before `type`
+//  Type representation
 // ---------------------------------------------------------------------------
 
 struct type;
@@ -170,9 +170,9 @@ struct type_checker {
 
   explicit type_checker();
 
-   typed_program check(const on1x::program &prog);
+  typed_program check(const on1x::program &prog);
 
-private:
+ private:
   typed_expr_ptr check_expr(const expr_ptr &e, std::shared_ptr<scope> sc);
   std::shared_ptr<type> infer(const expr_ptr &e, std::shared_ptr<scope> sc);
 

@@ -9,15 +9,8 @@
 #include <memory>
 #include <ostream>
 #include <string>
-
-#include "kbarena.h"
-#include "khash.h"
-
-namespace on1x {
-struct value;
-}
-
-KHASH_MAP_INIT_STR(on1x_binding, on1x::value *)
+#include <variant>
+#include <vector>
 
 namespace on1x {
 
@@ -34,7 +27,7 @@ struct value {
 
 struct env {
   std::shared_ptr<env> parent;
-  khash_t(on1x_binding) *bindings;
+  void *bindings;
   void *strings;
   explicit env(std::shared_ptr<env> p = {});
   ~env();

@@ -9,8 +9,12 @@
 #include <type_traits>
 
 #include "kmempool.h"
+#include "kbarena.h"
+#include "khash.h"
 #include "krng.h"
 #include "kstring.h"
+
+KHASH_MAP_INIT_STR(on1x_binding, on1x::value *)
 
 namespace on1x {
 namespace {
@@ -26,6 +30,10 @@ static char *copy_key(env *scope, const std::string &name) {
   if (!dst) return nullptr;
   std::memcpy(dst, name.c_str(), name.size() + 1);
   return dst;
+}
+
+static auto *binding_table(void *bindings) {
+  return static_cast<khash_t(on1x_binding) *>(bindings);
 }
 
 static krng_t &rng() {
@@ -145,11 +153,14 @@ static value_ptr randint_builtin(const std::vector<value_ptr> &args) {
 
 }  // namespace
 
-env::env(std::shared_ptr<env> p) : parent(std::move(p)), bindings(kh_init(on1x_binding)), strings(kba_init(65536)) {}
+env::env(std::shared_ptr<env> p)
+    : parent(std::move(p)),
+      bindings(kh_init(on1x_binding)),
+      strings(kba_init(65536)) {}
 
 env::~env() {
   if (bindings) {
-    kh_destroy(on1x_binding, bindings);
+    kh_destroy(on1x_binding, binding_table(bindings));
     bindings = nullptr;
   }
   if (strings) {
@@ -168,26 +179,28 @@ value_ptr make_value(value::node_t node) {
 value_ptr lookup(const std::shared_ptr<env> &scope, const std::string &name) {
   for (auto cur = scope; cur; cur = cur->parent) {
     if (!cur->bindings) continue;
-    const khiter_t k = kh_get(on1x_binding, cur->bindings, name.c_str());
-    if (k != kh_end(cur->bindings)) return wrap_value(kh_val(cur->bindings, k));
+    auto *table = binding_table(cur->bindings);
+    const khiter_t k = kh_get(on1x_binding, table, name.c_str());
+    if (k != kh_end(table)) return wrap_value(kh_val(table, k));
   }
   return {};
 }
 
 bool bind(const std::shared_ptr<env> &scope, const std::string &name, value_ptr value) {
   if (!scope || !scope->bindings) return false;
+  auto *table = binding_table(scope->bindings);
   int ret = 0;
-  const khiter_t k = kh_put(on1x_binding, scope->bindings, name.c_str(), &ret);
+  const khiter_t k = kh_put(on1x_binding, table, name.c_str(), &ret);
   if (ret < 0) return false;
   if (ret != 0) {
     char *key = copy_key(scope.get(), name);
     if (!key) {
-      kh_del(on1x_binding, scope->bindings, k);
+      kh_del(on1x_binding, table, k);
       return false;
     }
-    kh_key(scope->bindings, k) = key;
+    kh_key(table, k) = key;
   }
-  kh_val(scope->bindings, k) = value.get();
+  kh_val(table, k) = value.get();
   return true;
 }
 

@@ -1,8 +1,8 @@
 #ifndef ON1X_REWRITE_REWRITE_HPP
 #define ON1X_REWRITE_REWRITE_HPP
 
- #include "on1x/core/ast.hpp"
- #include "on1x/core/parser.hpp"
+#include "on1x/core/ast.hpp"
+#include "on1x/core/parser.hpp"
 
 #include <functional>
 #include <map>
@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -98,7 +99,7 @@ struct rewrite_rule {
   std::optional<expr_ptr> apply(const expr_ptr &e) const;
 };
 
-// Convenience: simple replace rule (pattern → replacement template)
+// Convenience: simple replace rule from a pattern to a replacement template.
 rewrite_rule make_rule(std::string name, pattern_ptr lhs, expr_ptr rhs);
 
 // Convenience: conditional rule with builder function

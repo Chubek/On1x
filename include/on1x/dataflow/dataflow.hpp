@@ -222,6 +222,11 @@ struct dominator_tree {
 
 dominator_tree compute_dominators(const cfg &graph);
 
+extern template struct dataflow_solver<liveness_set, direction::backward>;
+extern template struct dataflow_solver<reaching_defs_set, direction::forward>;
+extern template struct dataflow_solver<avail_exprs_set, direction::forward>;
+extern template struct dataflow_solver<const_prop_map, direction::forward>;
+
 }  // namespace on1x::dataflow
 
 #endif
