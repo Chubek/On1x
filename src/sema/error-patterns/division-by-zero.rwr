@@ -1,0 +1,1 @@
+(/ x 0) => sema_error_div_zero

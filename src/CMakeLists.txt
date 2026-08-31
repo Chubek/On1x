@@ -59,6 +59,18 @@ install(TARGETS on1x_tool
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/egraph/CMakeLists.txt")
-  add_subdirectory(egraph)
-endif()
+ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rewrite/CMakeLists.txt")
+   add_subdirectory(rewrite)
+ endif()
+ 
+ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/egraph/CMakeLists.txt")
+   add_subdirectory(egraph)
+ endif()
+
+ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sema/CMakeLists.txt")
+   add_subdirectory(sema)
+ endif()
+
+ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/dataflow/CMakeLists.txt")
+   add_subdirectory(dataflow)
+ endif()
